@@ -1,0 +1,18 @@
+{
+  "suffixDomains": 937820,
+  "exactDomains": 3,
+  "sourceRules": [
+    {
+      "file": "adult.json",
+      "sha256": "07274776d9f8b0ce214c1abf38e8fb6094c087b629e2b87722c42073ee1f5db1"
+    },
+    {
+      "file": "adult-additions.json",
+      "sha256": "7fb1867d2b06cc32e12fd48c83eb0a7b2f1f39779c2a8f479f29c647225a3f03"
+    },
+    {
+      "file": "adult-expanded.json",
+      "sha256": "92e35f5c308c4778d9244d53b679088ce59fd42dce0d15ece42af020fca11b33"
+    }
+  ]
+}

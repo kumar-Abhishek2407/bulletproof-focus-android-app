@@ -1,0 +1,5 @@
+<scale xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromXScale="1" android:toXScale="0"
+    android:fromYScale="1" android:toYScale="0"
+    android:pivotX="50%" android:pivotY="86%"
+    android:duration="420" android:interpolator="@android:interpolator/fast_out_slow_in" />

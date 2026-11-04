@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/blocklistproject/Lists",
+  "commit": "ee3bdbaddf49c756cf3340bb2e6a9dee5282d1c6",
+  "file": "porn.txt",
+  "license": "Unlicense",
+  "sourceDomains": 953197,
+  "additionalDomains": 931296,
+  "rules": 4657,
+  "sha256": "92e35f5c308c4778d9244d53b679088ce59fd42dce0d15ece42af020fca11b33"
+}

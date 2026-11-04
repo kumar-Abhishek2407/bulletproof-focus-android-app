@@ -1,0 +1,3 @@
+<resources>
+    <string name="accessibility_description">Optional app blocking: detects the package of the app whose window opens and returns Home when your timer or schedule blocks it. Does not retrieve screen text, passwords or window contents. App events are not stored or transmitted. Settings and calling apps remain accessible. You can turn this service off in Android Accessibility settings.</string>
+</resources>
