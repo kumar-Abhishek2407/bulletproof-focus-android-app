@@ -1,6 +1,10 @@
-# Still Focus for Android - normal and strict modes (0.29.0)
+# Still Focus for Android - normal and strict modes (0.29.1)
 
 Native Android focus app with timed website blocks, app focus screens and bundled adult-domain filtering. No account, analytics, ads or backend.
+
+## 0.29.1: Correct swipe direction
+
+Install [StillFocus-0.29.1.apk](artifacts/StillFocus-0.29.1.apk). Swipe left to open the tab on the right; swipe right to open the tab on the left. This fixes the reversed gesture in 0.29.0. The first and last tabs do not wrap around.
 
 ## 0.29.0: Smoother slides and clearer buttons
 

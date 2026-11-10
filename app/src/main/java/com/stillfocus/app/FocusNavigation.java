@@ -63,8 +63,8 @@ public final class FocusNavigation {
             else if(event.getActionMasked()==MotionEvent.ACTION_UP) {
                 boolean accept=allowed; allowed=false;
                 float dx=event.getX()-x,dy=event.getY()-y;
-                // User preference: swipe right to advance; the next page enters from the right.
-                int next=selected+(dx>0?1:-1);
+                // Follow the finger: swipe left to reveal the tab on the right.
+                int next=selected+(dx<0?1:-1);
                 if(accept && Math.abs(dx)>64*density && Math.abs(dx)>Math.abs(dy)*2 && next>=0 && next<4) return next;
             }
             return -1;
