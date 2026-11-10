@@ -8,6 +8,7 @@ public final class DnsPolicy {
     public static Set<String> vpnExemptPackages(Set<String> callingApps) {
         Set<String> result=new HashSet<>(callingApps);
         result.remove("com.truecaller");
+        result.removeIf(ScreenRules::browser);
         return result;
     }
     public static boolean mayUseNetworkDns(boolean adBlocking,boolean callActive,String host) {

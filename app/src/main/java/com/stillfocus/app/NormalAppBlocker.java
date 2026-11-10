@@ -13,10 +13,13 @@ import java.util.Locale;
 
 /** User-consented window events or usage polling with a shared focus overlay. */
 public final class NormalAppBlocker {
+    private static final java.util.Set<NormalAppBlocker> instances=new java.util.concurrent.CopyOnWriteArraySet<>();
+    public static void hideForPayment() { for(NormalAppBlocker blocker:instances) { blocker.hide(); blocker.foreground.clear(); blocker.exit.clear(); } }
     private final Context context;
     private final boolean eventDriven;
     private final FocusStore store;
     private final ScheduleStore schedules;
+    private final DailyLimitStore daily;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final ForegroundApp foreground=new ForegroundApp();
     private final BlockedAppExit exit=new BlockedAppExit();
@@ -33,9 +36,9 @@ public final class NormalAppBlocker {
         int mode=ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,android.os.Process.myUid(),c.getPackageName());
         return mode==AppOpsManager.MODE_ALLOWED;
     }
-    public static boolean ready(Context c) { return (FocusAccessibilityService.active() || usageAllowed(c)) && Settings.canDrawOverlays(c); }
+    public static boolean ready(Context c) { return !PaymentMode.enabled(c) && (FocusAccessibilityService.active() || usageAllowed(c)) && Settings.canDrawOverlays(c); }
     public NormalAppBlocker(Context c) { this(c,false); }
-    public NormalAppBlocker(Context c,boolean eventDriven) { this.eventDriven=eventDriven; context=c; store=new FocusStore(c); schedules=new ScheduleStore(c); windows=c.getSystemService(WindowManager.class); }
+    public NormalAppBlocker(Context c,boolean eventDriven) { this.eventDriven=eventDriven; context=c; store=new FocusStore(c); schedules=new ScheduleStore(c); daily=new DailyLimitStore(c); windows=c.getSystemService(WindowManager.class); }
     private final Runnable poll=new Runnable() {
         @Override public void run() {
             if(stopped) return;
@@ -43,8 +46,8 @@ public final class NormalAppBlocker {
             handler.postDelayed(this,200);
         }
     };
-    public void start() { handler.post(poll); }
-    public void stop() { stopped=true; handler.removeCallbacks(poll); hide(); }
+    public void start() { instances.add(this); handler.post(poll); }
+    public void stop() { instances.remove(this); stopped=true; handler.removeCallbacks(poll); hide(); }
     public void windowChanged(String pkg) {
         if(stopped || !eventDriven) return;
         if(pkg.isEmpty()) { foreground.clear(); hide(); exit.clear(); return; }
@@ -52,15 +55,22 @@ public final class NormalAppBlocker {
         try { update(); } catch(RuntimeException e) { hide(); }
     }
     private void update() {
+        if(PaymentMode.enabled(context)) {
+            daily.requestRefresh(); hide(); foreground.clear(); exit.clear(); since=0; return;
+        }
         // Only one controller owns overlays. Polling resumes when Accessibility disconnects.
         if(!eventDriven && FocusAccessibilityService.active()) { hide(); foreground.clear(); exit.clear(); since=0; return; }
 
         java.time.ZonedDateTime local=ScheduleStore.now();
         java.util.Set<String> paused=schedules.activeApps(false,local);
         paused.addAll(store.apps(false));
+        paused.addAll(daily.blockedApps());
         paused.removeIf(pkg->CallSafety.protectedApp(context,pkg));
-        if(paused.isEmpty() || !ready(context) || CallSafety.callAudio(context)) {
-            hide(); foreground.clear(); exit.clear(); since=0; return;
+        if(!ready(context) || CallSafety.callAudio(context)) {
+            hide(); foreground.idle(eventDriven); exit.clear(); since=0; return;
+        }
+        if(paused.isEmpty()) {
+            hide(); foreground.idle(eventDriven); exit.clear(); since=0; return;
         }
         if(!eventDriven) {
         long now=System.currentTimeMillis();
@@ -96,8 +106,9 @@ public final class NormalAppBlocker {
         if(countdown!=null) {
             long remaining=schedules.normalRemaining(pkg,local);
             remaining=Math.max(remaining,store.normalAppRemaining(pkg));
+            remaining=Math.max(remaining,daily.untilReset(pkg));
             long seconds=(remaining+999)/1000;
-            countdown.setText(String.format(Locale.getDefault(),"Available in %02d:%02d",seconds/60,seconds%60));
+            countdown.setText(daily.exhausted(pkg)?"Daily limit reached. Back at midnight.":String.format(Locale.getDefault(),"Available in %02d:%02d",seconds/60,seconds%60));
         }
     }
     private int dp(int value) { return (int)(value*context.getResources().getDisplayMetrics().density+.5f); }
@@ -122,7 +133,7 @@ public final class NormalAppBlocker {
         cover.setPadding(dp(28),dp(24),dp(28),dp(24)); cover.setBackgroundColor(FocusUi.PAPER);
         cover.addView(text("Still Focus · focus session",17)); cover.addView(text(label+" is on a break",30));
         long seconds=(Math.max(store.normalAppRemaining(pkg),schedules.normalRemaining(pkg,ScheduleStore.now()))+999)/1000;
-        String availability=String.format(Locale.getDefault(),"Available in %02d:%02d",seconds/60,seconds%60);
+        String availability=daily.exhausted(pkg)?"Daily limit reached. Back at midnight.":String.format(Locale.getDefault(),"Available in %02d:%02d",seconds/60,seconds%60);
         countdown=text(availability,24); cover.addView(countdown);
         Toast.makeText(context,label+" is on a break. "+availability,Toast.LENGTH_SHORT).show();
         cover.addView(text("Timer active. Returning Home.",16));

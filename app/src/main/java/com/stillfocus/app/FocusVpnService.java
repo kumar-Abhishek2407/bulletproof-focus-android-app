@@ -24,10 +24,11 @@ public final class FocusVpnService extends VpnService {
     private ScheduledExecutorService maintenance;
     private final Object retrySignal=new Object();
     private ConnectivityManager.NetworkCallback networkCallback;
-    private DomainIndex suffix,exact;
     private FocusStore store;
     private NormalAppBlocker appBlocker;
     private String lastNotice="";
+    private long lastHeartbeat;
+    private String previousExit="";
     private static final class Tunnel {
         final ParcelFileDescriptor descriptor;
         final FileOutputStream output;
@@ -38,6 +39,8 @@ public final class FocusVpnService extends VpnService {
         super.onCreate(); CallSafety.refresh(); store=new FocusStore(this);
         getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel("protection","Website protection",NotificationManager.IMPORTANCE_LOW));
         startForeground(1,notification("Starting protection"));
+        previousExit=ProtectionRecovery.lastExit(this);
+        try { ProtectionRecovery.schedule(this); } catch(RuntimeException e) { ProtectionRecovery.record(this,"Recovery check unavailable"); }
         appBlocker=new NormalAppBlocker(this); appBlocker.start();
         networkCallback=new ConnectivityManager.NetworkCallback() {
             @Override public void onAvailable(Network n) { wakeRecovery(); }
@@ -60,12 +63,17 @@ public final class FocusVpnService extends VpnService {
         reader=Executors.newSingleThreadExecutor();
         workers=new ThreadPoolExecutor(4,8,30,TimeUnit.SECONDS,new ArrayBlockingQueue<>(128),new ThreadPoolExecutor.AbortPolicy());
         maintenance=Executors.newSingleThreadScheduledExecutor();
-        try { ScheduleReceiver.schedule(this); SessionReceiver.schedule(this); } catch(RuntimeException ignored) { }
+        try { ScheduleReceiver.schedule(this); } catch(RuntimeException e) { ProtectionRecovery.record(this,"Schedule alarm unavailable"); }
+        try { SessionReceiver.schedule(this); } catch(RuntimeException e) { ProtectionRecovery.record(this,"Timer alarm unavailable"); }
         maintenance.scheduleWithFixedDelay(()-> {
             try { ManagedProtection.reconcile(this); } catch(RuntimeException ignored) { }
+            if(SystemClock.elapsedRealtime()-lastHeartbeat>=60000 || lastHeartbeat==0) {
+                lastHeartbeat=SystemClock.elapsedRealtime();
+                getSharedPreferences("protectionHealth",0).edit().putLong("heartbeat",System.currentTimeMillis()).putString("processExit",previousExit).apply();
+            }
             try {
                 if(Build.VERSION.SDK_INT>=29) alwaysOn=isAlwaysOn();
-                String notice=!running?status:AdBlocking.enabled(this) && lastAdFailure>lastAdSuccess && !CallSafety.callAudio(this)?"AdGuard unavailable - filtered requests are blocked":"Protection connected - no time limit";
+                String notice=PaymentMode.enabled(this)?(running?"Payment mode - DNS on; app and Shorts blocking off":"Payment mode - DNS needs attention"):!running?status:AdBlocking.enabled(this) && lastAdFailure>lastAdSuccess && !CallSafety.callAudio(this)?"AdGuard unavailable - filtered requests are blocked":"Protection connected - no time limit";
                 if(!notice.equals(lastNotice)) { lastNotice=notice; getSystemService(NotificationManager.class).notify(1,notification(notice)); }
             } catch(RuntimeException ignored) { }
         },0,1,TimeUnit.SECONDS);
@@ -83,8 +91,7 @@ public final class FocusVpnService extends VpnService {
             try {
                 if(VpnService.prepare(this)!=null) { revoked=true; reportIssue("VPN permission needed. Open Settings to restore it."); stopSelf(); return; }
                 status="Connecting protection";
-                if(suffix==null) try(InputStream in=getAssets().open("adult-domains.txt")) { suffix=new DomainIndex(in); }
-                if(exact==null) try(InputStream in=getAssets().open("adult-exact.txt")) { exact=new DomainIndex(in); }
+                WebsiteFilter.load(this);
                 if(closing) return;
                 Builder builder=new Builder().setSession("Still Focus - local DNS")
                     .setMtu(1500).addAddress("10.111.0.1",32).addDnsServer("10.111.0.2")
@@ -106,7 +113,7 @@ public final class FocusVpnService extends VpnService {
                     int n=input.read(buffer); if(n<0) throw new IOException("Tunnel ended");
                     DnsPacket packet=DnsPacket.parse(buffer,n); if(packet==null) continue;
                     queries.incrementAndGet(); lastQuery=SystemClock.elapsedRealtime();
-                    if(!CallDomains.carrier(packet.host) && (SiteRules.prefixBlocked(packet.host)||suffix.covers(packet.host)||exact.contains(packet.host)||store.blocks(packet.host))) write(connection,packet,packet.error(3));
+                    if(WebsiteFilter.blocked(this,packet.host)) write(connection,packet,packet.error(3));
                     else {
                         final Tunnel target=connection;
                         try { workers.execute(()->resolve(target,packet)); }
@@ -194,7 +201,16 @@ public final class FocusVpnService extends VpnService {
         String ads=!AdBlocking.enabled(c)?"Ad blocking: off":CallSafety.callAudio(c)?"Ad blocking: call bypass active":lastAdFailure>lastAdSuccess?"Ad blocking: AdGuard unavailable; filtered DNS requests are waiting. Turn off ad blocking to restore ordinary DNS.":lastAdSuccess>0?"Ad blocking: AdGuard responding":"Ad blocking: enabled; waiting for a DNS request";
         android.content.SharedPreferences health=c.getSharedPreferences("protectionHealth",0);
         long issueAt=health.getLong("issueAt",0);
-        return connection+"\n"+traffic+"\n"+ads+"\nTruecaller: included in DNS filtering; protected from app timers."+"\n"+dnsConfiguration(c)+(issueAt==0?"":"\nLast interruption: "+android.text.format.DateFormat.format("MMM d, HH:mm",issueAt)+" - "+health.getString("lastIssue",""));
+        long boundary=health.getLong("nextSchedule",0);
+        String schedule=boundary==0?"No enabled schedule boundary":"Next schedule boundary: "+android.text.format.DateFormat.format("MMM d, HH:mm",boundary);
+        String recovery=health.getString("recovery","No recovery attempt recorded");
+        long recoveryAt=health.getLong("recoveryAt",0),alarmAt=health.getLong("lastScheduleAlarm",0),beat=health.getLong("heartbeat",0);
+        if(recoveryAt>0) recovery+=" ("+android.text.format.DateFormat.format("MMM d, HH:mm",recoveryAt)+")";
+        schedule+="\nPrecise schedule alarms: "+(ScheduleReceiver.exactAllowed(c)?"allowed":"not allowed; sleep can delay boundaries");
+        if(alarmAt>0) schedule+="\nLast schedule alarm: "+android.text.format.DateFormat.format("MMM d, HH:mm",alarmAt);
+        if(beat>0) schedule+="\nLast service heartbeat: "+android.text.format.DateFormat.format("MMM d, HH:mm",beat);
+        schedule+="\nAccessibility: "+(FocusAccessibilityService.active()?"connected":"not connected; usage polling requires running service");
+        return connection+"\nScreen-aware blocking: "+FocusScreenService.status+"\n"+schedule+"\nRecovery: "+recovery+health.getString("processExit","")+"\n"+traffic+"\n"+ads+"\nTruecaller: included in DNS filtering; protected from app timers."+"\n"+dnsConfiguration(c)+(issueAt==0?"":"\nLast interruption: "+android.text.format.DateFormat.format("MMM d, HH:mm",issueAt)+" - "+health.getString("lastIssue",""));
     }
     public static String dnsConfiguration(Context c) {
         ConnectivityManager cm=c.getSystemService(ConnectivityManager.class);

@@ -22,6 +22,40 @@ public class CoreTests {
         b[24]=(byte)((dns.length+8)>>8); b[25]=(byte)(dns.length+8); System.arraycopy(dns,0,b,28,dns.length); return b;
     }
     public static void main(String[] args) throws Exception {
+        DailyUsageCounter usage=new DailyUsageCounter(1000,11000);
+        usage.resume(500,"youtube","one"); usage.pause(3000,"youtube","one");
+        usage.resume(4000,"youtube","two"); usage.pause(4500,"youtube","one");
+        usage.screen(6000,false); usage.screen(8000,true); usage.stop(10000);
+        check(usage.finish().get("youtube")==6000,"daily use clips midnight, ignores stale activity pause, and excludes screen-off/background");
+        DailyUsageCounter lockedUsage=new DailyUsageCounter(0,10000);
+        lockedUsage.resume(0,"one","a"); lockedUsage.lock(2000,true); lockedUsage.lock(5000,false);
+        lockedUsage.resume(7000,"two","b");
+        Map<String,Long> totals=lockedUsage.finish();
+        check(totals.get("one")==4000 && totals.get("two")==3000,"screen lock excluded and app totals independent");
+        check(!DailyUsageCounter.exhausted(119999,2,false),"daily limit editable while allowance remains");
+        check(DailyUsageCounter.exhausted(120000,2,false),"daily limit locks exactly at allowance");
+        check(DailyUsageCounter.exhausted(1000,120,true),"latched exhaustion cannot be undone by raising allowance or lower usage sample");
+        check(ScreenRules.pauseControl("Pause video") && ScreenRules.pauseControl("Pause (k)"),"explicit web player pause labels");
+        check(!ScreenRules.pauseControl("Play") && !ScreenRules.pauseControl("Pause your subscription"),"never click play or unrelated pause text");
+
+        BrowserCoverState pageCover=new BrowserCoverState();
+        pageCover.cover("com.brave.browser_nightly",7,60000,1000);
+        check(pageCover.keep("com.brave.browser_nightly",7,60999),"editing blocked URL retains cover before expiry");
+        check(!pageCover.keep("com.brave.browser_nightly",7,61000),"timer expiry removes cover even while editing URL");
+        check(!pageCover.keep("com.brave.browser",7,2000),"cover cannot transfer to another browser");
+        check(!pageCover.keep("com.brave.browser_nightly",8,2000),"cover cannot transfer to another window");
+        pageCover.cover("com.brave.browser_nightly",7,Long.MAX_VALUE,1000);
+        check(pageCover.keep("com.brave.browser_nightly",7,999999999),"persistent site rule does not expire like a timer");
+        pageCover.clear();
+        check(!pageCover.keep("com.brave.browser_nightly",7,2000),"leaving browser clears retained page state");
+        for(String url:new String[]{"youtube.com/shorts", "https://www.youtube.com/shorts/abc?feature=share", "https://m.youtube.com/shorts/abc", "https://youtube.com/%73horts/abc", "https://youtube.com/a/../shorts/abc", "https://youtube.com/shorts#feed"})
+            check(ScreenRules.webShorts(url),"web Shorts path detected: "+url);
+        for(String url:new String[]{"youtube.com", "https://youtube.com/watch?v=abc", "https://youtube.com/watch?next=/shorts/abc", "https://youtube.com/#/shorts", "https://youtube.com/shortstuff", "https://youtube.com/shorts/../watch", "https://youtube.com.evil.test/shorts/abc", "https://evil.test/youtube.com/shorts", "https://youtube.com@evil.test/shorts", "about:blank", "", "youtube.com/SHORTS"})
+            check(!ScreenRules.webShorts(url),"non-Shorts page stays allowed: "+url);
+        check(!ScreenRules.webShorts(null),"missing address never triggers web Shorts");
+        TimedBlock webShorts=new TimedBlock("web-shorts",ScreenRules.WEB_SHORTS,false,false,120000,120000,3,true);
+        check(webShorts.shorts && !webShorts.app,"browser Shorts is separate from native app Shorts");
+        check(webShorts.remaining(3,60000,60000)==60000 && webShorts.remaining(3,120000,120000)==0,"web Shorts expires at its own deadline");
         Set<String> callingApps=new HashSet<>(Arrays.asList("com.truecaller","com.android.phone","com.android.server.telecom","com.android.dialer","com.whatsapp"));
         Set<String> bypass=DnsPolicy.vpnExemptPackages(callingApps);
         check(!bypass.contains("com.truecaller"),"Truecaller DNS is filtered even when it is a calling app");
@@ -45,6 +79,21 @@ public class CoreTests {
         check(SiteRules.prefixBlocked("cdn.fsiblog.example") && SiteRules.prefixBlocked("sex.example.com"),"keyword rules cover subdomains and alternate suffixes");
         check(SiteRules.prefixBlocked("sussex.example"),"broad substring rule also matches unrelated names");
         check(!SiteRules.prefixBlocked("example.com") && !SiteRules.prefixBlocked("blog.example"),"ordinary host remains allowed");
+        check(ScreenRules.browser("com.brave.browser_nightly"),"Nightly is a supported browser");
+        check(!ScreenRules.browser("com.brave.browser_nightly.fake"),"browser package boundaries");
+        check(ScreenRules.host("https://example.com/path?q=word").equals("example.com"),"only hostname used for browser checks");
+        check(ScreenRules.host("search words").isEmpty(),"ignore search/address editing text");
+        check(ScreenRules.host("brave://settings").isEmpty(),"ignore browser settings");
+        check(ScreenRules.host("https://example.com@evil.test").isEmpty(),"reject ambiguous credential-style URL");
+        check(ScreenRules.shortsMarker(ScreenRules.YOUTUBE+":id/reel_watch_player",false,""),"Shorts player marker");
+        check(!ScreenRules.shortsMarker(ScreenRules.YOUTUBE+":id/reel_shelf",false,"Shorts"),"Shorts preview shelf does not block ordinary Home");
+        check(!ScreenRules.shortsMarker("",false,"Shorts"),"unselected Shorts tab is not a Shorts screen");
+        check(ScreenRules.shortsMarker("",true,"Shorts"),"selected Shorts tab detected");
+        check(!ScreenRules.shortsMarker("other:id/reel_watch_player",false,""),"foreign resource is not a YouTube marker");
+        check(!DnsPolicy.vpnExemptPackages(Set.of("com.brave.browser_nightly","com.android.phone")).contains("com.brave.browser_nightly"),"Nightly cannot inherit calling DNS exemption");
+        TimedBlock shortsTimer=new TimedBlock("shorts",ScreenRules.YOUTUBE,true,false,60000,60000,1,true);
+        check(shortsTimer.shorts && !shortsTimer.strict && shortsTimer.remaining(1,30000,30000)==30000,"Shorts timer retains independent deadline");
+        check(!new TimedBlock("legacy",ScreenRules.YOUTUBE,true,false,60000,60000,1).shorts,"old app timers remain whole-app timers");
         BlockedAppExit exit=new BlockedAppExit();
         check(exit.shouldExit("youtube",10,100),"redirect immediately on detection");
         check(!exit.shouldExit("youtube",11,200),"activity changes do not spam Home");
@@ -96,6 +145,16 @@ public class CoreTests {
         AppSchedule disabled=new AppSchedule("c","Disabled",Set.of("other"),1260,540,false,false);
         AppSchedule managed=new AppSchedule("d","Strict",Set.of("game"),1260,540,true,true);
         List<AppSchedule> schedules=List.of(a,b,disabled,managed);
+        for(AppSchedule locked:List.of(a,managed)) {
+            for(java.time.ZonedDateTime at:List.of(evening,evening.plusHours(2),evening.plusHours(11))) {
+                try { locked.requireEditable(at); throw new AssertionError("active schedule edit accepted"); }
+                catch(IllegalStateException expected) { checks++; }
+            }
+            locked.requireEditable(evening.minusNanos(1)); checks++;
+            locked.requireEditable(evening.plusHours(12)); checks++;
+        }
+        disabled.requireEditable(evening.plusHours(2)); checks++;
+
         check(AppSchedule.activeApps(schedules,false,evening.plusHours(2)).equals(Set.of("youtube","social")),"union overlapping normal schedules");
         check(AppSchedule.activeApps(schedules,true,evening.plusHours(2)).equals(Set.of("game")),"strict schedule union is independent");
         check(AppSchedule.activeApps(schedules,false,evening.plusHours(12)).contains("youtube"),"overlap keeps app paused when first schedule ends");
@@ -119,6 +178,17 @@ public class CoreTests {
         check(!new SetupState(true).needsSetup(),"saved completion skips setup on restart");
         SetupState upgrade=new SetupState(false);
         check(upgrade.observe(true,true,true) && !upgrade.needsSetup(),"upgrade recognizes permissions already granted");
+        ForegroundApp scheduledForeground=new ForegroundApp();
+        scheduledForeground.event(1,"music",true);
+        scheduledForeground.idle(true);
+        check(scheduledForeground.current().equals("music"),"retain window package until schedule starts without another event");
+        DailyWindow night=new DailyWindow(21*60,9*60);
+        check(!night.activeMinute(20*60+59) && night.activeMinute(21*60),"9 PM activates while foreground stays unchanged");
+        check(night.activeMinute(8*60+59) && !night.activeMinute(9*60),"overnight schedule releases at 9 AM");
+        scheduledForeground.event(2,"settings",true); scheduledForeground.idle(true);
+        check(scheduledForeground.current().equals("settings"),"inactive interval still tracks navigation away");
+        scheduledForeground.idle(false);
+        check(scheduledForeground.current().isEmpty(),"polling fallback resets idle event history");
         ForegroundApp foreground=new ForegroundApp();
         foreground.event(1,"youtube",true); check(foreground.current().equals("youtube"),"detect selected app");
         foreground.event(2,"settings",true); foreground.event(3,"youtube",false);

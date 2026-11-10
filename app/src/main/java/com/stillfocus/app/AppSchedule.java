@@ -15,6 +15,9 @@ public final class AppSchedule {
         this.strict=strict; this.enabled=enabled;
     }
     public boolean active(ZonedDateTime now) { return enabled && window.active(now); }
+    public void requireEditable(ZonedDateTime now) {
+        if(active(now)) throw new IllegalStateException("This schedule is active. Wait until its end time to change it.");
+    }
     public static Set<String> activeApps(Iterable<AppSchedule> schedules,boolean strict,ZonedDateTime now) {
         Set<String> result=new HashSet<>();
         for(AppSchedule s:schedules) if(s.strict==strict && s.active(now)) result.addAll(s.apps);

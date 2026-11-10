@@ -1,4 +1,4 @@
-param([switch]$Lint)
+param([switch]$Lint, [switch]$DeviceBuild)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
@@ -7,7 +7,8 @@ $env:ANDROID_USER_HOME = Join-Path $projectRoot '.tools/android-user'
 $env:ANDROID_HOME = Join-Path $projectRoot '.tools/android-sdk'
 $gradle = Join-Path $projectRoot '.tools/gradle-8.11.1/bin/gradle.bat'
 if (-not (Test-Path $gradle)) { throw 'Run tools/bootstrap.ps1 first, or use gradlew with your Android Studio SDK.' }
-$tasks = @('assembleDebug')
-if ($Lint) { $tasks += 'lintDebug' }
+$variant = if ($DeviceBuild) { 'Device' } else { 'Debug' }
+$tasks = @('assemble' + $variant)
+if ($Lint) { $tasks += 'lint' + $variant }
 & $gradle --no-daemon --console=plain @tasks
 if ($LASTEXITCODE -ne 0) { throw 'Android build failed' }

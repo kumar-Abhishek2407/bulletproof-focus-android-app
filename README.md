@@ -1,6 +1,244 @@
-# Still Focus for Android - normal and strict modes (0.17.0)
+# Still Focus for Android - normal and strict modes (0.29.0)
 
 Native Android focus app with timed website blocks, app focus screens and bundled adult-domain filtering. No account, analytics, ads or backend.
+
+## 0.29.0: Smoother slides and clearer buttons
+
+Install [StillFocus-0.29.0.apk](artifacts/StillFocus-0.29.0.apk). This non-debuggable device-test build keeps the existing development signing certificate.
+
+- Swipe right to advance to the next tab; the current page slides left and the next page enters from the right. Swipe left to go back. Slides last 280 ms without fading or bouncing.
+- Action buttons share a brighter mint colour and dark text.
+- Accessibility setup explanations use shorter, simpler wording while explaining screen access and consent.
+- The approved Mint breathe dot appears on Active blockers when timers are active and Apps with limits when limits are saved. It gently changes colour and size, stops when the window loses focus, and respects disabled animations. [Compare the original previews](artifacts/ui-preview/active-dot-examples.html).
+
+Payment compatibility and blocking behaviour are unchanged by this UI update. Phone testing is still needed to judge the transition on the Lava device.
+
+## 0.28.0: Faster tabs and narrower screen access
+
+Install [StillFocus-0.28.0.apk](artifacts/StillFocus-0.28.0.apk). This device-test APK is non-debuggable and uses the same development signing certificate as earlier versions, so it can upgrade them without clearing rules. It is not a Google Play-reviewed release.
+
+### Navigation
+
+The Daily limit tab no longer enumerates installed apps or loads icons before its first frame. Lists load only after opening them; package labels and icons load in the background and rows are added in small batches. Tab activities are reused instead of destroyed/rebuilt at every switch, and duplicate resume renders are removed. Directional transitions use a shorter 190 ms easing curve, with immediate ripple feedback and a restrained drag response during swipes. System animation settings are respected. Existing uniform buttons, collapsed subpage navigation, hidden active-blocker lists and hidden daily search remain.
+
+### Payment investigation
+
+The screen service now checks the focused window ID against a window confirmed by an allowlisted YouTube/Brave event **before** requesting its root. An unrelated focused window is rejected without reading its content. Shorts actions and browser covers recheck focus before acting. While a browser cover is visible, a lightweight metadata-only check removes it after focus moves elsewhere; it does not inspect another app's nodes.
+
+These changes reduce actual screen access and stale-overlay exposure. They do **not** guarantee that Google Pay, Paytm or Navi accepts an enabled Accessibility service. Both original blocking services and Shorts features remain available; there is no new payment mode or hidden permission change. No payment transaction was performed during development.
+
+See [the compatibility investigation](docs/payment-compatibility.md) for verified evidence, alternatives, limitations and the device validation still required. Regain's exact permission/trust state could not be compared because it is not installed on the connected phone. Its documented Accessibility use and Google Pay's handling of unknown apps support a trust/distribution hypothesis, not a confirmed explanation for all three payment apps.
+
+Build this APK with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build.ps1 -DeviceBuild -Lint
+```
+
+The default build remains a development debug APK. Neither changing the debugging flag nor using the development signing certificate grants Play verification or a payment-provider exemption.
+
+## 0.27.0: Consistent actions and swipe navigation
+
+Install [StillFocus-0.27.0.apk](artifacts/StillFocus-0.27.0.apk) over your current version.
+
+- Focus uses matching **Block applications**, **Block websites**, and **Active blockers** buttons. The active list opens only after selecting Active blockers.
+- Daily limit uses matching **Set daily limit** and **Apps with limits** actions. Neither list appears before selection; app search appears inside Set daily limit only. Apps with limits shows configured allowances without search. Choosing either action clears the previous search.
+- The selected bottom tab is wider, has a larger label, and gently expands into place. On subpages, the four-button bar collapses into one enlarged parent-tab button. Tap it to return to the parent page, or swipe to another tab.
+- Swipe left/right between Focus, Daily limit, Schedule and Settings. Horizontal gestures beginning on text fields, number pickers, sliders or system-navigation edges do not switch tabs. Vertical scrolling and multi-touch do not switch tabs. Navigation has directional slide/fade transitions and respects Android's disabled animation setting.
+
+Blocking permissions, payment compatibility, timer enforcement and uninstall behaviour are unchanged in this UI release.
+
+## 0.26.0: Four tabs and active-window locks
+
+Install [StillFocus-0.26.0.apk](artifacts/StillFocus-0.26.0.apk) over the existing version; rules and permissions are retained.
+
+```powershell
+.\adb.exe install -r "D:\bulletproof-focus-android-app\artifacts\StillFocus-0.26.0.apk"
+```
+
+- **Focus:** only application/website pause actions and active blocker countdowns. Choose applications (including YouTube > Shorts only), choose a duration, and start. Website timers remain independent.
+- **Daily limit:** shows configured apps and their remaining daily allowances. **Set daily limit** opens the app list; **Apps with limits** returns to configured allowances. Tap an app to adjust or remove its allowance while time remains. After exhaustion, changes remain locked until local midnight. Usage earlier today counts. Saving checks usage again, including when an editor was opened before exhaustion.
+- **Schedule:** all schedule creation, app selection and timing controls. Enabled Normal and Strict schedules cannot be edited, disabled or deleted during their active window. A 9 PM?9 AM schedule locks at 9 PM and unlocks at 9 AM. Outside that window, changes are allowed. The storage layer rechecks this at save/delete time, and an open editor returns to the list when its saved schedule starts.
+- **Settings:** permissions, protection options, DNS, diagnostics and strict provisioning.
+
+These are in-app editing locks. Normal mode remains subject to Android permission revocation and force-stop. Daily allowances measure foreground usage, not continuous wall-clock countdowns.
+
+### Payment compatibility and uninstall protection: unresolved requirements
+
+This release does **not** claim payment compatibility is fixed. Paytm, Google Pay and Navi were reported to reject Still Focus's enabled Accessibility services. Google Pay [documents this category of restriction](https://support.google.com/pay/india/answer/17165523?hl=en-GB). Merely hiding our cover or changing navigation does not remove an enabled service from Android's permission state.
+
+Regain's [privacy policy](https://regainapp.ai/legal/privacy-policy/) lists Accessibility, usage and overlay permissions. Its [website](https://regainapp.ai/) advertises uninstall prevention but does not document the implementation. We have not inspected the user's Regain permission state or verified its payment classification. Android's [app-access-risk verdict](https://developer.android.com/google/play/integrity/verdicts) can exempt Accessibility services that passed enhanced Google Play review; that is not proof that Regain has this exemption, that all three payment apps use that mechanism, or that publishing Still Focus alone will resolve the problem.
+
+Still Focus retains its existing device-owner uninstall protection. Android's [setUninstallBlocked API](https://developer.android.com/reference/android/app/admin/DevicePolicyManager#setUninstallBlocked(android.content.ComponentName,java.lang.String,boolean)) requires privileged device-policy authority; ordinary usage/overlay permissions do not grant it. No new laptop-free uninstall lock was added. No payment mode, hidden permission restoration or payment-security bypass was added.
+
+Required device validation: switch among all four tabs; add and exhaust a short daily allowance; attempt saving an already-open allowance editor after exhaustion; create a Normal overnight schedule and attempt edit/disable/delete inside and outside the active window; verify app/site timers and YouTube Shorts still enforce. Payment testing remains blocked by the reported permission rejection, and requires a separately reviewed compatibility/distribution approach rather than a UI change. No real transactions were performed during development.
+
+## 0.25.0: Simpler navigation
+
+Install [StillFocus-0.25.0.apk](artifacts/StillFocus-0.25.0.apk) over the existing app. This update keeps your rules and permissions.
+
+- **Focus:** choose apps for a new pause, pause websites, or view running timers.
+- **Blocks:** open Apps and YouTube Shorts, Websites, Daily limits or Schedules.
+- **Apps:** choose applications; expand YouTube to select the whole app or Shorts only. Set hours/minutes and start.
+- **Settings:** permissions, optional screen checks, DNS filtering and strict setup.
+
+The shared theme uses charcoal surfaces and soft green controls. Payment mode is no longer offered as a new workflow. If it was already enabled in 0.24, use **Restore paused protection**, then manually restore your chosen Accessibility services in Android settings. Upgrading does not silently enable services or clear the existing pause.
+
+**Payment compatibility is unresolved.** The user reports alerts in Paytm, Google Pay and Navi. Google Pay [documents restrictions on unknown apps with active Accessibility access](https://support.google.com/pay/india/answer/17165523?hl=en-GB). Regain's [official Play listing](https://play.google.com/store/apps/details?id=ai.regainapp) also declares Accessibility for Shorts blocking. This does not establish which services are enabled on the user's Regain installation or why payment apps accept it. This UI release does not change the permission architecture or claim to fix those alerts. Physical-device payment and blocking tests are still required; Play distribution alone is not a guarantee of compatibility.
+
+The following 0.24 section describes the previous release; starting Payment mode is no longer offered in 0.25.
+
+## 0.24.0: Payment mode and refreshed UI
+
+Install [StillFocus-0.24.0.apk](artifacts/StillFocus-0.24.0.apk) over your current version:
+
+```powershell
+.\adb.exe install -r "D:\bulletproof-focus-android-app\artifacts\StillFocus-0.24.0.apk"
+```
+
+### Payment compatibility
+
+A payment app may identify Still Focus's Accessibility services as enhanced access even when no overlay is visible. Combining the two services would not remove this capability. This release provides an explicit compatibility pause, not a way to conceal enabled permissions or bypass a bank's checks.
+
+1. From Home or Settings, open **Payment mode > Start payment mode** and confirm the explained protection gap.
+2. Still Focus persists the pause, immediately removes its normal/browser overlays, and calls `disableSelf()` on both connected Accessibility services. Usage-polling fallback is also paused so it cannot recreate a cover. If a service is enabled but disconnected, Android may still list it: use **Check Android Accessibility settings** and turn both Still Focus entries off. Wait for the page to report both off.
+3. Open your payment app yourself and retry. Its security policy decides whether this resolves the alert; payment success has not been verified on the user's device. If it separately requests disabling display-over-apps permission, a shortcut opens that setting.
+4. Return to Still Focus and tap **Finished paying - restore blocking**. Android Accessibility settings opens. Manually re-enable **Still Focus app blocking**, and **Still Focus screen-aware blocking** if you use Shorts/browser-page detection. Previously granted in-app consent is retained. Restore display-over-apps permission too if you turned it off.
+
+Payment mode persists across process/service restarts and reboot. It does not automatically end, secretly re-enable Accessibility, disable Play Protect, or change another app's settings. Timers keep their original deadlines; daily usage continues counting while the normal controller runs, and saved daily exhaustion locks remain. **Normal app/daily-limit enforcement and native/web Shorts checks are inactive during the pause.** DNS filtering continues when the VPN is running. Existing device-owner suspensions and Strict restrictions remain active and are not relaxed by Payment mode. The Home screen and VPN notification identify the reduced protection.
+
+Android requires the user to [enable Accessibility services in settings](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService). Google Pay documents [payment restrictions involving enabled Accessibility services](https://support.google.com/pay/india/answer/17165523?hl=en-GB); Paytm, Google Pay and Navi were subsequently reported affected; their handling of this specific APK remains unverified.
+
+### Approved visual refresh
+
+Ivory backgrounds, white cards, periwinkle controls and restrained teal accents replace the previous large coloured panels. In **Apps > Choose applications**, expand **YouTube** to choose **Whole application** or the nested **Shorts only** row. These are mutually exclusive choices within YouTube. Clear selection removes YouTube from the draft; existing active timers remain locked. Searching for Shorts also finds the YouTube parent. Other apps retain their icon/name checkboxes. The daily-limit and schedule pages share the updated palette.
+
+Validation includes existing domain/usage/deadline tests, service-scope checks and a guard against payment mode clearing rules or restoring Accessibility/overlays. Build/lint and upgrade signing are checked. Physical-device checks remain necessary: payment-mode entry with both services on, enabled-but-disconnected services, VPN restart while paused, payment retry, restoring each service, daily-limit exhaustion during pause, and YouTube selection/search/rotation with large system text.
+
+## 0.23.0: per-app daily limits and web Shorts pause requests
+
+Install [StillFocus-0.23.0.apk](artifacts/StillFocus-0.23.0.apk) over the previous version:
+
+```powershell
+.\adb.exe install -r "D:\bulletproof-focus-android-app\artifacts\StillFocus-0.23.0.apk"
+```
+
+### Set daily limit
+
+1. Open **Apps > Set daily limit**, enable Android **Usage access**, and keep normal app-blocking protection and display-over-other-apps access enabled.
+2. Search for an app, tap it, and choose hours/minutes. Each app has its own daily allowance, from 1 minute to 24 hours.
+3. The allowance counts total foreground use since local midnight, **including use earlier today**. Background audio is not counted. If today's use already exceeds the newly saved allowance, it locks immediately.
+4. Edit or remove a limit while allowance remains. Once exhausted, both changes and removal are rejected by the store (including an editor left open across expiry). The app is intercepted using normal-mode app blocking with **Daily limit reached. Back at midnight.**
+5. Allowances recur daily. Usage and exhaustion reset at the next local date; the configured limit remains. A backward date change does not reset saved counters. Each day's maximum observed usage and exhausted state persist across app/process restarts.
+
+Daily limits are separate from schedules and pause timers; an app blocked by either still stays blocked. This first implementation uses **normal-mode interception**, even on a device enrolled for Strict mode; it does not add package suspension or uninstall protection for daily limits. Android Settings can stop protection. Usage access and a running blocker are required. Usage samples refresh in the background about every two seconds while protection is running; Android event delivery can add delay. Multi-window/OEM usage reporting, changes to the device clock/time zone and missing system history can affect accounting. Only configured apps' daily aggregate totals are saved locally; raw usage events are not stored or transmitted. Phone/calling apps and system navigation remain excluded.
+
+### Web Shorts audio
+
+When a detected YouTube Shorts web page is covered, the screen-aware service looks for explicitly labelled player Pause controls and requests a click. It never sends global media keys, changes volume or takes audio focus from other apps. The cover reports whether Pause was requested, the player exposes Play, or the control is unavailable. If the browser does not expose a supported control, audio can still continue; use the browser's media notification to pause it. Device verification is required. Native YouTube Shorts behavior remains unchanged.
+
+The screen-aware disclosure now explains these player-control checks. Keep it enabled in Android Accessibility settings. No new permission, package scope or gesture capability is added. Browser address editing and normal tab controls remain available.
+
+Validation: pure tests cover cumulative use across activities, screen-off/lock gaps, midnight clipping, independent apps, exact exhaustion and sticky locks; pause-label tests reject Play/unrelated controls. APK/lint and privacy guards are also run. Phone checks: set a small allowance, use the app in several visits, leave the editor open at exhaustion, restart Still Focus, try increasing/removing it, and verify next-day reset. Test Brave Nightly Shorts with sound, unavailable controls, a normal YouTube video, another music app, and calls.
+
+Accounting follows Android's [UsageEvents lifecycle events](https://developer.android.com/reference/android/app/usage/UsageEvents.Event). Player actions use the existing [Accessibility node action mechanism](https://developer.android.com/guide/topics/ui/accessibility/service).
+
+## 0.22.0: block the page, keep Brave open
+
+Install [StillFocus-0.22.0.apk](artifacts/StillFocus-0.22.0.apk) over the previous version:
+
+```powershell
+.\adb.exe install -r "D:\bulletproof-focus-android-app\artifacts\StillFocus-0.22.0.apk"
+```
+
+The previous browser handler requested Home on blocked domains (and as a fallback for web Shorts). That could look like Brave closing repeatedly when reopening the same blocked tab; it is not evidence of a browser crash. Browser checks now cover only the exposed web-content area with **This page is blocked**. There is no browser Back/Home action, forced stop, automatic tab closure or history change. The address bar/tab controls stay available to navigate elsewhere. Native YouTube Shorts retains its existing Back/Home behavior.
+
+Enable **Screen-aware blocking** and keep VPN protection on. If the service does not reconnect after updating, toggle this service off/on in Android Accessibility settings. Brave Stable/Beta/Nightly use the same bundled domain lists and custom domain/keyword rules as the VPN. No category name or blocked URL appears on the cover. Existing screen-access consent is retained; no extra package access or gesture capability is requested. The service now also locates the web-content rectangle and the focused application window; it skips HTML descendants and never reads page/form text.
+
+The cover disappears on an allowed page, timer expiry, leaving the browser, service interruption or calls. Editing an address does not uncover an already blocked page; browser controls and the keyboard remain available. This is a visual/interaction block for detected pages, **not a guarantee that their network requests or background media never run**. DNS filtering remains the network layer. Unlisted domains, hidden URLs or missing web-content bounds can evade detection, so the app cannot promise to block every adult site. It does not intercept HTTPS content.
+
+Device checks: keep a blocked tab plus an allowed tab open in Nightly; reopen the blocked tab repeatedly, type an allowed URL, switch tabs, open tab overview, rotate and try private tabs. Confirm the address bar, keyboard, system navigation and calls remain usable. Check both a custom timer and bundled rules, then timer expiry and service disable. APK/lint and host checks do not replace these physical-device checks.
+
+Implementation uses Android's [accessibility overlay window type](https://developer.android.com/reference/android/view/accessibility/AccessibilityWindowInfo#TYPE_ACCESSIBILITY_OVERLAY), which permits inspecting the underlying app without navigating it away.
+
+## 0.21.0: website quick picks and web Shorts timers
+
+Install [StillFocus-0.21.0.apk](artifacts/StillFocus-0.21.0.apk) over your current version.
+
+```powershell
+.\adb.exe install -r "D:\bulletproof-focus-android-app\artifacts\StillFocus-0.21.0.apk"
+```
+
+1. Open **Websites**. Under **Quick picks**, tap YouTube, Shorts only, Instagram, Reddit, Facebook or X / Twitter. Tap again to deselect. You can still type custom domains.
+2. **YouTube** blocks the full website. **Shorts only** creates a separate browser timer for `youtube.com/shorts` and its video paths, including mobile/www URLs. Picking either switches away from the other quick pick. Manually adding the whole YouTube domain also blocks regular videos.
+3. For web Shorts, enable **Screen-aware blocking** below the selection, then choose hours/minutes and start. Active blocks show **YouTube Shorts (web)**. This timer is independent of native YouTube Shorts and other website timers. Pasting a Shorts URL also selects path-only blocking instead of silently blocking the whole domain.
+4. Test in **Brave, Brave Beta or Brave Nightly**: open a normal YouTube watch page, then a `/shorts/VIDEO_ID` page. The Shorts page should request Back, with Home as a fallback, and show **Shorts are on a break**. Retry after expiry; Shorts should be accessible again.
+
+Web Shorts uses the existing, explicitly enabled address-field Accessibility check, not DNS path filtering. It requires the browser to expose the current URL, including its path. Chrome is not in this screen-aware service's supported browser list. Hidden/elided addresses, private/fullscreen pages, or layouts that suppress the path can bypass this check; physical-device validation is still required. No arbitrary page content or browsing history is collected. Whole-site DNS blocking and native YouTube Shorts detection retain their existing behavior.
+
+Host tests cover Shorts path boundaries, mobile URLs, encoded paths, ordinary watch pages, query/fragment false positives, lookalike hosts and timer expiry. For device testing also check selection after rotation, editing URLs, separate app/web timers, and service disable/re-enable.
+
+## 0.20.0: Brave browser checks and YouTube Shorts timers
+
+Install [StillFocus-0.20.0.apk](artifacts/StillFocus-0.20.0.apk) over the current version. In your platform-tools PowerShell window:
+
+```powershell
+.\adb.exe install -r "D:\bulletproof-focus-android-app\artifacts\StillFocus-0.20.0.apk"
+```
+
+### Enable the separate screen-aware service
+
+Open **Settings and help > Screen-aware blocking > Set up screen-aware blocking**. Read the disclosure, agree, then enable **Still Focus screen-aware blocking** in Android Accessibility settings. Return to the app and confirm it is connected. Keep the original **Still Focus app blocking** service enabled for whole-app timers.
+
+This is a new, separately consented service with window-content access restricted to YouTube and Brave Stable/Beta/Nightly. It checks supported browser address fields and YouTube resource identifiers/selected tab descriptions locally. Password fields are skipped; URLs and screen contents are not logged, stored or transmitted. This capability is broader than the original package-name-only service; the existing service retains its no-content-access configuration. Declared Accessibility capabilities can still trigger sideload warnings; the working USB development-install route remains available.
+
+### Brave Nightly
+
+Brave variants are explicitly retained in VPN DNS filtering even if discovered among calling providers. The optional screen-aware service additionally reads an exposed, unfocused address bar and returns Home when its hostname matches the same bundled/custom rules used by the DNS VPN. Both paths share one immutable blocklist index rather than loading separate copies. Matching pages may load briefly before detection; this is an access-interception layer, not HTTPS traffic filtering.
+
+The user reported this bypass with browser Secure DNS already off; its exact cause has not been reproduced or confirmed on-device. Keep browser Secure DNS and Android Private DNS off for the DNS layer. Cached connections, direct IP/encrypted DNS, hidden address bars and private/fullscreen pages that suppress Accessibility can bypass one or both layers. The service does not read arbitrary page text, change browser settings, or guarantee classification of every site. Check **Settings > Keep protection running > Screen-aware blocking** for a generic status without revealing addresses.
+
+### YouTube: Shorts only or whole application
+
+1. Open **Apps > Choose applications**, select **YouTube**, then tap **Done**.
+2. Under **What to block on YouTube?**, choose **Whole application** or **Shorts only**.
+3. For Shorts only, choose **Normal** mode and enable the separate screen-aware service. Strict mode suspends an entire package and cannot selectively suspend Shorts.
+4. Choose hours/minutes and start the timer. A detected Shorts screen requests Back with **Shorts are on a break**, falling back to Home if the screen persists; ordinary YouTube videos remain available unless covered by another whole-app schedule.
+5. Active blocks show **YouTube Shorts** with its independent deadline. Older timers default to whole-app behavior on upgrade. Shorts options apply to manual YouTube timers, not YouTube Music, browser Shorts or recurring schedules.
+
+Shorts detection is experimental: it uses specific player resource IDs or a selected Shorts tab (English/Hindi labels), not arbitrary video/page text or an unselected Shorts button. YouTube versions, locales, layout experiments, PiP and background playback can differ. There is no supported YouTube API for this UI distinction in this implementation; target-device testing is required. The service will not block all YouTube screens when it cannot identify Shorts.
+
+### Validation
+
+Host checks cover package boundaries, URL-to-host parsing, selected-versus-unselected Shorts controls, preview-shelf exclusion, separate timer flags and old-timer defaults, and the new service's narrow package allowlist/consent requirement. Existing DNS/domain and timer tests still run. Device checks remain pending: Brave Nightly normal/private tabs with a custom blocked domain; an allowed domain; editing the address bar; and YouTube Home/search/regular videos versus Shorts opened by tab or deep link. Check timer expiry, service disable/re-enable, rotation, calls, and background/Recents behavior. If YouTube markers are not exposed, diagnostics report that no supported Shorts marker was found; this is not proof that the screen is not Shorts.
+
+## 0.19.0: scrollable duration wheels
+
+Install [StillFocus-0.19.0.apk](artifacts/StillFocus-0.19.0.apk) over your existing version. Both Apps and Websites now have separate **Hours** and **Minutes** wheels. Scroll each column; the summary shows the combined duration (for example, 1 hr 30 min). Quick choices remain 2 min, 25 min and 1 hr. App and website drafts remain separate and survive navigation/rotation. A zero duration is rejected; the existing maximum of 365 days is retained (8,760 hours, 0 minutes). Active timers and schedules are unchanged.
+
+Device check: select 1 hour 30 minutes, navigate away/back and rotate, verify the summary, and confirm the resulting timer is 90 minutes. Repeat on the website page; scrolling a wheel should not scroll the containing page. Check zero duration, quick choices and large system text. Physical-device visual verification is pending.
+
+## 0.18.0: recovery and schedule fixes
+
+Install [StillFocus-0.18.0.apk](artifacts/StillFocus-0.18.0.apk) over the current version and open Still Focus once to register the persisted recovery job. For USB installation from your platform-tools PowerShell folder:
+
+```powershell
+.\adb.exe install -r "D:\bulletproof-focus-android-app\artifacts\StillFocus-0.18.0.apk"
+```
+
+The reported Lava failure occurred with both Always-on VPN and Accessibility enabled. The VPN icon returned only after opening Still Focus. This indicates an interruption, but the exact process-stop cause has not yet been verified on-device.
+
+Changes:
+
+- Accessibility keeps the most recent foreground package during inactive windows, so a schedule can activate while the selected app remains open without a fresh window event.
+- A persisted Android JobScheduler check attempts recovery periodically (15-minute minimum interval, subject to Android delays). It rearms schedule/timer alarms and requests the already-consented VPN service when disconnected. It does not override force-stop or revoked VPN consent.
+- Accessibility connection/window events request missing VPN recovery, throttled to one attempt per minute. Alarm handling attempts service recovery even if policy reconciliation or alarm rearming fails.
+- Settings diagnostics show last process-exit reason, recovery attempt, service heartbeat, next schedule boundary, last schedule alarm and precise-alarm access. No browsing/app-use history is recorded.
+- Schedule cards distinguish an active time window from missing protection prerequisites.
+
+After updating, test a short schedule that starts two minutes ahead while staying inside the selected app; then test the overnight 9 PM-9 AM schedule. Keep the existing Always-on VPN and Accessibility settings enabled, and confirm Alarms & reminders access for precise schedule boundaries. Leave Block connections without VPN off for this DNS-only VPN. Check the two-hour timer again without reopening Still Focus during the run. If protection stops, open Settings > Keep protection running and record the process-exit/recovery lines. Android's recorded exit reason is evidence, not a guarantee of the exact vendor-specific cause.
+
+Host tests cover the retained foreground state, overnight boundaries and protected recovery service declaration. Build/lint do not replace long-running physical-device tests. Android may delay jobs during sleep or deny background restarts; the update does not guarantee continuous service under all power-management conditions. See [Android jobs](https://developer.android.com/reference/android/app/job/JobScheduler) and [Always-on VPN](https://developer.android.com/develop/connectivity/vpn).
 
 ## Optional Accessibility blocking (0.17.0)
 
@@ -27,7 +265,7 @@ Normal mode cannot prevent the app process from starting, remove another app's R
 
 ### 1. Install or update
 
-Install [StillFocus-0.17.0.apk](artifacts/StillFocus-0.17.0.apk), then open **Still Focus**. Install over your existing version to retain settings, schedules and timers; do not uninstall first. This is a debug-signed testing build. If Android blocks installation, read the warning and see [Play Protect and distribution](#play-protect-and-distribution).
+Install [StillFocus-0.18.0.apk](artifacts/StillFocus-0.18.0.apk), then open **Still Focus**. Install over your existing version to retain settings, schedules and timers; do not uninstall first. This is a debug-signed testing build. If Android blocks installation, read the warning and see [Play Protect and distribution](#play-protect-and-distribution).
 
 #### USB installation on Windows (tested installation route)
 
@@ -168,7 +406,7 @@ If ads persist, report the installed app version (at the bottom of Settings), th
 
 ## How app blocking works
 
-With explicit special-access permission, the VPN foreground service polls Android UsageEvents approximately every 200 ms to track the foreground package name in memory. It displays an application overlay only over user-selected apps during an active normal session. An optional, consented Accessibility service can instead receive app-window events and request the system Home action. No screen text, password fields or page contents are retrieved. Usage-event history is not saved or sent off-device. System navigation and Settings remain accessible; the overlay does not appear over the lock screen.
+With explicit special-access permission, the VPN foreground service polls Android UsageEvents approximately every 200 ms to track the foreground package name in memory. It displays an application overlay only over user-selected apps during an active normal session. An optional, consented Accessibility service can instead receive app-window events and request the system Home action. The original app-blocking service retrieves no screen text or page contents. The separately enabled screen-aware service checks supported address fields and YouTube controls as described above; neither stores browsing/app-use history. System navigation and Settings remain accessible; the overlay does not appear over the lock screen.
 
 The overlay blocks interaction, not the app process or network. Background audio, existing downloads and picture-in-picture may continue. Split-screen behavior, apps that hide third-party overlays, permission revocation and manufacturer power management can limit blocking. There can be a short delay before the focus screen appears. These behaviors need testing on your target phone.
 

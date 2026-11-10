@@ -52,7 +52,7 @@ public final class ScheduleStore {
         List<AppSchedule> previous=all(),updated=new ArrayList<>();
         for(AppSchedule s:previous) {
             if(s.id.equals(id)) {
-                if(s.strict && s.active(now())) throw new IllegalStateException("This strict schedule is active. Wait until its end time to change it.");
+                s.requireEditable(now());
             } else updated.add(s);
         }
         if(next!=null) {

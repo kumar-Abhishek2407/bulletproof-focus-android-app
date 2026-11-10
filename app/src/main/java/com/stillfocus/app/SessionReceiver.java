@@ -9,5 +9,9 @@ public final class SessionReceiver extends BroadcastReceiver {
         PendingIntent callback=PendingIntent.getBroadcast(c,4,new Intent(c,SessionReceiver.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
         c.getSystemService(AlarmManager.class).setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,SystemClock.elapsedRealtime()+remaining,callback);
     }
-    @Override public void onReceive(Context c,Intent i) { ManagedProtection.reconcile(c); schedule(c); }
+    @Override public void onReceive(Context c,Intent i) {
+        try { ManagedProtection.reconcile(c); } catch(RuntimeException e) { ProtectionRecovery.record(c,"Timer policy needs attention"); }
+        try { schedule(c); } catch(RuntimeException e) { ProtectionRecovery.record(c,"Timer alarm could not be rearmed"); }
+        ProtectionRecovery.attempt(c,"timer boundary");
+    }
 }

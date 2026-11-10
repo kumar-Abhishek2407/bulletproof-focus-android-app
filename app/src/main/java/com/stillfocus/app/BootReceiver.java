@@ -8,6 +8,7 @@ public final class BootReceiver extends BroadcastReceiver {
         try { ManagedProtection.reconcile(c); } catch(RuntimeException ignored) { }
         try { SessionReceiver.schedule(c); } catch(RuntimeException ignored) { }
         try { ScheduleReceiver.schedule(c); } catch(RuntimeException ignored) { }
+        try { ProtectionRecovery.schedule(c); } catch(RuntimeException ignored) { }
         if(new FocusStore(c).enabled() && VpnService.prepare(c)==null) {
             try { c.startForegroundService(new Intent(c,FocusVpnService.class)); }
             catch(RuntimeException e) { FocusVpnService.status="Open Still Focus to resume website protection"; }

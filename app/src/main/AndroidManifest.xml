@@ -10,12 +10,18 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent><intent><action android:name="android.telecom.ConnectionService"/></intent></queries>
     <application android:label="Still Focus" android:theme="@style/AppTheme" android:icon="@drawable/ic_shield" android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false" android:supportsRtl="true">
+        <activity android:name=".DailyLimitActivity" android:exported="false"/>
         <activity android:name=".ScheduleActivity" android:exported="false"/>
         <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
         <service android:name=".FocusVpnService" android:stopWithTask="false" android:permission="android.permission.BIND_VPN_SERVICE" android:exported="true" android:foregroundServiceType="specialUse">
             <intent-filter><action android:name="android.net.VpnService"/></intent-filter>
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-enabled website filtering and scheduled app focus reminders" />
         </service>
+        <service android:name=".FocusScreenService" android:label="Still Focus screen-aware blocking" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/screen_accessibility" />
+        </service>
+        <service android:name=".ProtectionRecovery" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <service android:name=".FocusAccessibilityService" android:label="Still Focus app blocking" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/focus_accessibility" />

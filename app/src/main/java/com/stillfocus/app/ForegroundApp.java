@@ -18,5 +18,7 @@ public final class ForegroundApp {
     }
     public String current() { return current; }
     public long resumedAt() { return resumedAt; }
+    // Window events may not repeat when a schedule activates while the user stays in one app.
+    public void idle(boolean eventDriven) { if(!eventDriven) clear(); }
     public void clear() { current=""; activity=""; timestamp=-1; resumedAt=-1; }
 }
