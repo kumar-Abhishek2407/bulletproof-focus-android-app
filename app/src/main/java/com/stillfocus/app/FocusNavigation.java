@@ -20,13 +20,15 @@ public final class FocusNavigation {
         float unit=activity.getResources().getDisplayMetrics().density;
         bar.setPadding((int)(4*unit),(int)(10*unit),(int)(4*unit),(int)(10*unit));
         String[] labels={"Focus","Daily limit","Schedule","Settings"};
+        int[] icons={R.drawable.nav_focus,R.drawable.nav_limit,R.drawable.nav_schedule,R.drawable.nav_settings};
         for(int n=0;n<labels.length;n++) {
             if(expanded && n!=selected) continue;
             final int index=n; TextView tab=new TextView(activity); tab.setText(expanded?"<  "+labels[n]:labels[n]); tab.setTextSize(expanded?17:n==selected?14:12);
+            if(!expanded) { android.graphics.drawable.Drawable icon=activity.getDrawable(icons[n]).mutate(); icon.setTint(n==selected?FocusUi.ACCENT:FocusUi.MUTED); tab.setCompoundDrawablesWithIntrinsicBounds(null,icon,null,null); tab.setCompoundDrawablePadding((int)(5*unit)); }
             tab.setGravity(Gravity.CENTER); tab.setMinHeight((int)(56*unit)); tab.setPadding((int)(2*unit),(int)(8*unit),(int)(2*unit),(int)(8*unit));
             tab.setTextColor(n==selected?FocusUi.ACCENT:FocusUi.MUTED);
             tab.setTypeface(null,n==selected?Typeface.BOLD:Typeface.NORMAL);
-            tab.setBackground(new RippleDrawable(ColorStateList.valueOf(0x22b6e397),FocusUi.surface(activity,n==selected?FocusUi.LAVENDER:FocusUi.PAPER,14),null));
+            tab.setBackground(new RippleDrawable(ColorStateList.valueOf(0x226554c0),FocusUi.surface(activity,n==selected?FocusUi.LAVENDER:FocusUi.PAPER,14),null));
             tab.setSelected(n==selected); tab.setContentDescription(expanded?"Back to "+labels[n]:labels[n]+(n==selected?", selected":""));
             tab.setFocusable(true); tab.setOnClickListener(v->{ if(expanded || index!=selected) select.accept(index); });
             bar.addView(tab,new LinearLayout.LayoutParams(0,-2,n==selected?1.4f:1f));
@@ -38,6 +40,7 @@ public final class FocusNavigation {
         return bar;
     }
     public static void open(Activity activity,int tab) {
+        if(activity.getParent() instanceof TabHostActivity) { ((TabHostActivity)activity.getParent()).select(tab,true); return; }
         Class<?> target=tab==1?DailyLimitActivity.class:tab==2?ScheduleActivity.class:MainActivity.class;
         Intent intent=new Intent(activity,target).putExtra("navigationTab",tab);
         // Reuse the three tab activities rather than constructing whole screens for every tap.

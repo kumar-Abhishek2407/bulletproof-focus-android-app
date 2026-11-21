@@ -66,6 +66,16 @@ public class CoreTests {
         check(DnsPolicy.mayUseNetworkDns(true,true,"calls.example.com"),"active calls preserve network DNS safety bypass");
         check(DnsPolicy.mayUseNetworkDns(true,false,"epdg.epc.mnc001.mcc404.pub.3gppnetwork.org"),"carrier calling domains bypass provider outages");
         check(!DnsPolicy.mayUseNetworkDns(true,false,"ads.truecaller.com"),"Truecaller ad hosts have no broad domain exemption");
+        for(String ad:new String[]{"ads-segment-profile-noneu.truecaller.com","ads-config-engine-noneu.truecaller.com","ads-router-noneu.truecaller.com"}) {
+            check(DnsPolicy.localAdBlocked(true,ad),"known Truecaller ads blocked locally before call bypass");
+            check(DnsPolicy.localAdBlocked(true,"cdn."+ad.toUpperCase(Locale.ROOT)+"."),"ad subdomains, case and trailing dot");
+            check(!DnsPolicy.localAdBlocked(false,ad),"ad toggle respected locally");
+            check(!DnsPolicy.localAdBlocked(true,ad+".example.com"),"ad suffix boundary");
+            check(!DnsPolicy.localAdBlocked(true,"not"+ad),"ad prefix boundary");
+        }
+        for(String allowed:new String[]{"truecaller.com","search5-noneu.truecaller.com","whatsapp.net","epdg.epc.mnc001.mcc404.pub.3gppnetwork.org"})
+            check(!DnsPolicy.localAdBlocked(true,allowed),"caller lookup and communication hosts not locally blocked");
+        check(!DnsPolicy.localAdBlocked(true,null),"missing ad hostname safe");
         RecoveryBackoff retry=new RecoveryBackoff();
         check(retry.next(0)==1000 && retry.next(0)==2000,"recovery starts quickly and backs off");
         for(int i=0;i<400;i++) check(retry.next(0)<=30000,"recovery never grows past 30 seconds or expires");

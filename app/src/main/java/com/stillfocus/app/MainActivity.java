@@ -15,21 +15,23 @@ import android.widget.*;
 import java.util.*;
 
 public final class MainActivity extends Activity {
-    private static final int GREEN=FocusUi.ACCENT,INK=FocusUi.INK,MUTED=FocusUi.MUTED,PAPER=FocusUi.PAPER;
+    private int GREEN,INK,MUTED,PAPER;
     private int transitionDirection=0;
     private int renderGeneration;
     private String renderedPermissions="";
-    private enum Page { SETUP, HOME, BLOCKS, APPS, APP_PICKER, WEBSITES, SESSION, SETTINGS, STRICT_SETUP, PAYMENTS }
+    private enum Page { SETUP, HOME, BLOCKS, APPS, APP_PICKER, WEBSITES, SESSION, SETTINGS, SETTINGS_DETAILS, STRICT_SETUP, PAYMENTS }
     private Page page;
     private final FocusNavigation.Swipe swipe=new FocusNavigation.Swipe();
-    private int selectedTab() { return page==Page.SETTINGS || page==Page.STRICT_SETUP || page==Page.PAYMENTS?3:0; }
+    private int selectedTab() { return page==Page.SETTINGS || page==Page.SETTINGS_DETAILS || page==Page.STRICT_SETUP || page==Page.PAYMENTS?3:0; }
+    public boolean isTabRoot() { return page==Page.HOME || page==Page.SETTINGS; }
     private void selectTab(int tab) {
+        if(getParent() instanceof TabHostActivity && tab!=selectedTab()) { ((TabHostActivity)getParent()).select(tab,true); return; }
         captureDraft(); int direction=tab>selectedTab()?1:-1;
         if(tab==0 || tab==3) { page=tab==0?Page.HOME:Page.SETTINGS; transitionDirection=direction; render(); }
         else FocusNavigation.open(this,tab);
     }
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
-        int tab=page==Page.SETUP?-1:swipe.target(this,event,selectedTab());
+        int tab=getParent()!=null || page==Page.SETUP?-1:swipe.target(this,event,selectedTab());
         if(tab>=0) { MotionEvent cancel=MotionEvent.obtain(event); cancel.setAction(MotionEvent.ACTION_CANCEL); super.dispatchTouchEvent(cancel); cancel.recycle(); selectTab(tab); return true; }
         return super.dispatchTouchEvent(event);
     }
@@ -54,9 +56,10 @@ public final class MainActivity extends Activity {
     };
 
     @Override public void onCreate(Bundle saved) {
-        super.onCreate(saved); store=new FocusStore(this); ui=getSharedPreferences("interface",0);
+        FocusUi.applyTheme(this); GREEN=FocusUi.ACCENT; INK=FocusUi.INK; MUTED=FocusUi.MUTED; PAPER=FocusUi.PAPER; super.onCreate(saved); store=new FocusStore(this); ui=getSharedPreferences("interface",0);
         setup=new SetupState(ui.getBoolean("setupComplete",false));
         if(saved!=null) {
+            settingsSection=saved.getString("settingsSection","Permissions");
             youtubeShorts=saved.getBoolean("youtubeShorts",false);
             websiteShorts=saved.getBoolean("websiteShorts",false);
             ArrayList<String> apps=saved.getStringArrayList("apps"); if(apps!=null) selectedApps.addAll(apps);
@@ -70,7 +73,7 @@ public final class MainActivity extends Activity {
         if(page==Page.SETUP && !setup.needsSetup()) page=Page.HOME;
         if(saved==null && getIntent().getIntExtra("navigationTab",0)==3 && page!=Page.SETUP) page=Page.SETTINGS;
         render();
-        if(Build.VERSION.SDK_INT>=33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
+        if(getParent()==null && Build.VERSION.SDK_INT>=33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
     }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent); setIntent(intent);
@@ -82,7 +85,7 @@ public final class MainActivity extends Activity {
         captureDraft(); super.onSaveInstanceState(out);
         out.putBoolean("youtubeShorts",youtubeShorts);
         out.putBoolean("websiteShorts",websiteShorts);
-        out.putString("page",page.name()); out.putString("strictParent",strictParent.name()); out.putStringArrayList("apps",new ArrayList<>(selectedApps));
+        out.putString("settingsSection",settingsSection); out.putString("page",page.name()); out.putString("strictParent",strictParent.name()); out.putStringArrayList("apps",new ArrayList<>(selectedApps));
         out.putString("websites",websiteDraft); out.putString("appDuration",appDuration); out.putString("websiteDuration",websiteDuration);
     }
     private boolean vpnAllowed() { return VpnService.prepare(this)==null; }
@@ -108,7 +111,7 @@ public final class MainActivity extends Activity {
     }
     private LinearLayout column() { LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     private LinearLayout card(LinearLayout parent,int color) {
-        LinearLayout l=column(); l.setPadding(dp(18),dp(16),dp(18),dp(16)); l.setBackground(background(color,24)); l.setElevation(dp(1));
+        LinearLayout l=column(); l.setPadding(dp(18),dp(16),dp(18),dp(16)); l.setBackground(background(color,24)); l.setElevation(0);
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2); p.topMargin=dp(6); p.bottomMargin=dp(6); parent.addView(l,p); return l;
     }
     private ActiveDotButton activeBlockersButton;
@@ -146,7 +149,7 @@ public final class MainActivity extends Activity {
             android.graphics.Insets bars=i.getInsets(WindowInsets.Type.systemBars()); v.setPadding(bars.left,bars.top,bars.right,bars.bottom); return i;
         });
         else shell.setOnApplyWindowInsetsListener((v,i)-> { v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom()); return i; });
-        if(page!=Page.HOME && page!=Page.SETUP && page!=Page.BLOCKS && page!=Page.SETTINGS) root.addView(button(page==Page.APP_PICKER?"< Block apps":page==Page.STRICT_SETUP?"< Back":"< Home",false,()->navigate(page==Page.APP_PICKER?Page.APPS:page==Page.STRICT_SETUP?strictParent:Page.HOME)));
+        if(page!=Page.HOME && page!=Page.SETUP && page!=Page.BLOCKS && page!=Page.SETTINGS) root.addView(button(page==Page.APP_PICKER?"< Block apps":page==Page.STRICT_SETUP?"< Back":"< Home",false,()->navigate(page==Page.APP_PICKER?Page.APPS:page==Page.SETTINGS_DETAILS?Page.SETTINGS:page==Page.STRICT_SETUP?strictParent:Page.HOME)));
         root.addView(text("Still Focus",20,FocusUi.TEAL,true));
         switch(page) {
             case SETUP: setupPage(); break;
@@ -157,6 +160,7 @@ public final class MainActivity extends Activity {
             case WEBSITES: websitesPage(); break;
             case SESSION: sessionPage(); break;
             case SETTINGS: settingsPage(); break;
+            case SETTINGS_DETAILS: settingsDetailsPage(); break;
             case STRICT_SETUP: strictSetupPage(); break;
             case PAYMENTS: paymentPage(); break;
         }
@@ -192,8 +196,8 @@ public final class MainActivity extends Activity {
         b.setEnabled(!granted); box.addView(b);
     }
     private void homePage() {
-        heading("", "Focus", "A little space for what matters.");
-        root.addView(button("Block applications",false,()->navigate(Page.APPS)));
+        heading("", "Focus", "");
+        root.addView(button("Block apps",true,()->navigate(Page.APPS)));
         root.addView(button("Block websites",false,()->navigate(Page.WEBSITES)));
         activeBlockersButton=(ActiveDotButton)button("Active blockers",false,()->navigate(Page.SESSION));
         activeBlockersButton.setPaddingRelative(dp(36),dp(10),dp(36),dp(10));
@@ -206,7 +210,7 @@ public final class MainActivity extends Activity {
         heading("HOME / APPLICATIONS", "Apps", "Choose apps and set a pause time.");
         modeCard();
         if(!strictPreferred() && !FocusAccessibilityService.active()) root.addView(button("App detection settings",false,()->navigate(Page.SETTINGS)));
-        root.addView(text("Normal mode covers detected apps and returns Home immediately. Strict mode suspends apps through Android.",14,MUTED,false));
+
         if(!strictPreferred() && !NormalAppBlocker.ready(this)) {
             root.addView(button("Restore app permissions",false,()->navigate(Page.SETTINGS)));
         }
@@ -258,7 +262,11 @@ public final class MainActivity extends Activity {
         int end=Math.min(start+8,entries.size());
         for(int index=start;index<end;index++) {
             AppCatalog.Entry entry=entries.get(index); String pkg=entry.packageName,label=entry.label;
-            boolean youtube=ScreenRules.YOUTUBE.equals(pkg),already=paused.contains(pkg);
+            boolean youtube=ScreenRules.YOUTUBE.equals(pkg);
+            boolean shortsActive=youtube && store.shortsRemaining()>0;
+            boolean wholeActive=false;
+            if(youtube) for(TimedBlock block:store.active()) if(block.app && !block.shorts && pkg.equals(block.target)) wholeActive=true;
+            boolean already=youtube?wholeActive:paused.contains(pkg);
             if(already) selectedApps.remove(pkg);
             LinearLayout group=column(); group.setPadding(dp(12),dp(8),dp(12),dp(8)); group.setBackground(background(Color.WHITE,20));
             group.setTag((label+" "+pkg+(youtube?" shorts":"")).toLowerCase(Locale.ROOT));
@@ -276,10 +284,13 @@ public final class MainActivity extends Activity {
                 for(RadioButton choice:new RadioButton[]{whole,shorts}) {
                     choice.setButtonTintList(FocusUi.selection()); choice.setTextColor(INK); choice.setTextSize(16); choice.setMinHeight(dp(52)); choices.addView(choice); choice.setEnabled(!already);
                 }
+                shorts.setEnabled(!already && !shortsActive);
+                if(shortsActive) shorts.setText("Shorts only (timer running)");
                 children.addView(choices);
-                children.addView(text("Keep regular videos available with Shorts only.",13,MUTED,false));
+                children.addView(text(already?"YouTube is paused until its timer ends.":shortsActive?"You can block the whole app too. Your Shorts timer keeps its own end time.":"Choose one: whole YouTube or Shorts only.",13,MUTED,false));
+                if(shortsActive && youtubeShorts) selectedApps.remove(pkg);
                 if(selectedApps.contains(pkg)) choices.check(youtubeShorts?shorts.getId():whole.getId());
-                if(already) choices.check(store.shortsRemaining()>0?shorts.getId():whole.getId());
+                if(already) choices.check(whole.getId());
                 Button clear=button("Clear YouTube selection",false,()-> { choices.clearCheck(); selectedApps.remove(pkg); updateAppCount(); });
                 clear.setVisibility(selectedApps.contains(pkg)?View.VISIBLE:View.GONE); children.addView(clear);
                 Runnable style=()-> {
@@ -346,7 +357,7 @@ public final class MainActivity extends Activity {
                     boolean remove=picks.get(index).isSelected();
                     java.util.List<String> values=new ArrayList<>();
                     for(String raw:websiteDraft.split("[\\s,;]+")) {
-                        if(raw.isEmpty()) continue;
+                        if(raw.isEmpty()) { continue; }
                         boolean shorts=ScreenRules.webShorts(raw);
                         String host=ScreenRules.host(raw);
                         if(index==1 && (shorts || DomainRules.covers("youtube.com",host))) continue;
@@ -433,6 +444,7 @@ public final class MainActivity extends Activity {
         captureDraft();
         try {
             Set<String> domains=new HashSet<>(); Set<String> packages=apps?new HashSet<>(selectedApps):Collections.emptySet();
+            store.requireYouTubeTimerAvailable(packages,apps && youtubeShorts && packages.contains(ScreenRules.YOUTUBE));
             boolean selectedWebShorts=!apps && websiteShorts;
             if(!apps) for(String raw:websiteDraft.split("[\\s,;]+")) if(!raw.isEmpty()) {
                 if(ScreenRules.webShorts(raw)) selectedWebShorts=true;
@@ -467,13 +479,63 @@ public final class MainActivity extends Activity {
         root.addView(text(store.strict()?"Strict session: uninstall, force-stop and data clearing are locked until expiry. Afterwards, remove device-owner setup in Settings if you want to uninstall. Existing blocks keep their saved mode. New blocks can use either mode.":"Normal session: no in-app cancel button. Android Settings can stop Still Focus. Device-owner enrollment, if present, must be removed before uninstall.",13,MUTED,false));
         root.addView(button("Back to focus home",true,()->navigate(Page.HOME)));
     }
+    private String settingsSection="Permissions";
+    private void openSettingsSection(String section) { settingsSection=section; navigate(Page.SETTINGS_DETAILS); }
     private void settingsPage() {
-        heading("HOME / SETTINGS", "Settings and help", "Permission controls stay here after your one-time setup. We won't reopen setup automatically.");
+        heading("", "Settings", "");
+        root.addView(button("Permissions",false,()->openSettingsSection("Permissions")));
+        root.addView(button("Protection",false,()->openSettingsSection("Protection")));
+        root.addView(button("Ad blocking: "+(AdBlocking.enabled(this)?"On":"Off"),false,()->openSettingsSection("Ad blocking")));
+        root.addView(button(FocusUi.dark?"Switch to light mode":"Switch to dark mode",false,()->FocusUi.toggleTheme(this)));
+        root.addView(button("Help and diagnostics",false,()->openSettingsSection("Help")));
+        root.addView(text("Still Focus "+versionName(),13,MUTED,false));
+    }
+    private void settingsDetailsPage() {
+        heading("",settingsSection,"");
+        switch(settingsSection) {
+            case "Permissions":
+                root.addView(button("Website access: "+(vpnAllowed()?"On":"Needed"),false,this::requestVpn));
+                root.addView(button("Usage access: "+(NormalAppBlocker.usageAllowed(this)?"On":"Needed"),false,()->openSpecialSetting(Settings.ACTION_USAGE_ACCESS_SETTINGS)));
+                root.addView(button("Display over apps: "+(Settings.canDrawOverlays(this)?"On":"Needed"),false,()->openSpecialSetting(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)));
+                accessibilityCard(); screenProtectionCard();
+                break;
+            case "Protection":
+                modeCard();
+                root.addView(button("Strict mode setup",false,this::openStrictSetup));
+                root.addView(button("Always-on VPN",false,()->new AlertDialog.Builder(this).setTitle("Keep protection on")
+                    .setMessage("Enable Always-on VPN for Still Focus. Leave Block connections without VPN off.")
+                    .setNegativeButton("Later",null).setPositiveButton("Open settings",(d,w)->openSystemSetting(Settings.ACTION_VPN_SETTINGS)).show()));
+                root.addView(button("Battery settings",false,()->openSystemSetting(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+                root.addView(button("More controls",false,()->openSettingsSection("Advanced")));
+                break;
+            case "Ad blocking":
+                        root.addView(button("Ad blocking: "+(AdBlocking.enabled(this)?"On":"Off"),false,()-> {
+            if(AdBlocking.enabled(this)) { AdBlocking.set(this,false); render(); return; }
+            new AlertDialog.Builder(this).setTitle("Enable AdGuard DNS?")
+                .setMessage("Allowed DNS queries will be sent over HTTPS to AdGuard's public ad-blocking resolver. This changes DNS inside Still Focus only. Phone services and known calling apps bypass it, except Truecaller, whose DNS is filtered. Calling domains and detected calls retain a safety bypass. If AdGuard is unavailable, other DNS requests fail until it returns or you turn ad blocking off. YouTube video ads cannot reliably be blocked by DNS. Call reliability depends on your carrier and phone: test mobile and Wi-Fi calls after enabling.")
+                .setNegativeButton("Keep off",null).setPositiveButton("Enable",(d,w)-> { AdBlocking.set(this,true); render(); }).show();
+        }));
+
+                break;
+            case "Help":
+                root.addView(button("Browser setup",false,this::browserHelp));
+                root.addView(button("View diagnostics",false,()->message("Diagnostics",FocusVpnService.diagnostics(this))));
+                root.addView(button("App info",false,()->openSpecialSetting(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)));
+                root.addView(button("Advanced settings",false,()->openSettingsSection("Advanced")));
+                break;
+            default: advancedSettingsPage();
+        }
+    }
+    private void advancedSettingsPage() {
+        heading("", "Settings", "Make Still Focus work for you.");
         if(PaymentMode.enabled(this)) root.addView(button("Restore paused protection",false,()->navigate(Page.PAYMENTS)));
         health=text("",14,MUTED,false); root.addView(health);
+        root.addView(text("Protection",20,INK,true));
         modeCard();
+        root.addView(text("Permissions",20,INK,true));
         accessibilityCard();
         screenProtectionCard();
+        root.addView(text("Filtering",20,INK,true));
         root.addView(button("Ad blocking: "+(AdBlocking.enabled(this)?"On":"Off"),false,()-> {
             if(AdBlocking.enabled(this)) { AdBlocking.set(this,false); render(); return; }
             new AlertDialog.Builder(this).setTitle("Enable AdGuard DNS?")
@@ -506,7 +568,7 @@ public final class MainActivity extends Activity {
             .setNegativeButton("Later",null).setPositiveButton("Open battery settings",(d,w)->openSystemSetting(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)).show()));
         persistence.addView(button("Open Still Focus app info",false,()->openSpecialSetting(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)));
         persistence.addView(button("Check browser and DNS settings",false,this::browserHelp));
-        connectionDetails=text("",14,MUTED,false); connectionDetails.setTextIsSelectable(true); persistence.addView(connectionDetails);
+        persistence.addView(button("View diagnostics",false,()->message("Diagnostics",FocusVpnService.diagnostics(this))));
         persistence.addView(button("Restart protection service",false,()-> {
             if(!vpnAllowed()) { requestVpn(); return; }
             try { store.enable(); startForegroundService(new Intent(this,FocusVpnService.class).setAction(FocusVpnService.ACTION_RECONNECT)); }
@@ -517,6 +579,7 @@ public final class MainActivity extends Activity {
             new AlertDialog.Builder(this).setTitle("Remove device-owner setup?").setMessage("This removes Still Focus as device owner without resetting your phone. Future strict sessions will require setup again. Normal mode remains available.")
                 .setNegativeButton("Keep",null).setPositiveButton("Release",(d,w)-> { try { ManagedProtection.releaseOwnership(this); render(); } catch(RuntimeException e) { message("Could not release",e.getMessage()); } }).show();
         }));
+        LinearLayout appearance=card(root,Color.WHITE); appearance.addView(text("Appearance",22,INK,true)); appearance.addView(text((FocusUi.dark?"Soft charcoal / Lavender":"Warm white / Iris purple")+"\nUse the top-right button to switch.",14,MUTED,false));
         root.addView(text("Still Focus "+versionName()+" / Normal and strict modes\nNo account. No browsing history stored. Optional AdGuard DNS receives DNS queries.",13,MUTED,false));
     }
     private void paymentPage() {
@@ -653,7 +716,7 @@ public final class MainActivity extends Activity {
         if(pickerDone!=null) pickerDone.setText(selectedApps.isEmpty()?"Done":"Done ("+selectedApps.size()+" selected)");
     }
     private void updateLiveViews() {
-        if(activeBlockersButton!=null) activeBlockersButton.setActive(!store.active().isEmpty());
+        if(activeBlockersButton!=null) { int count=store.active().size(); activeBlockersButton.setText("Active blocks \u00b7 "+count); activeBlockersButton.setContentDescription("Active blocks, "+count); activeBlockersButton.setActive(count>0); }
         if(paymentStatus!=null) {
             int enabled=PaymentMode.enabledServices(this);
             paymentStatus.setText(PaymentMode.enabled(this)?(enabled==0?"Both Still Focus Accessibility services are off.":enabled+" Still Focus service(s) still enabled. Turn both off in Android settings.")+(FocusVpnService.running?"\nDNS filtering is running.":"\nDNS filtering needs attention."):"Payment mode is off. Enable your chosen services in Android Accessibility settings to restore responsive app and Shorts blocking.");
@@ -690,8 +753,8 @@ public final class MainActivity extends Activity {
         if(request==7 && result==RESULT_OK) { serviceRequested=false; ensureService(); permissionReturn(); }
     }
     private void handleBack() {
-        if(page==Page.HOME || page==Page.SETUP) moveTaskToBack(true);
-        else navigate(page==Page.APP_PICKER?Page.APPS:page==Page.STRICT_SETUP?strictParent:Page.HOME);
+        if(page==Page.HOME || page==Page.SETUP) { if(getParent()!=null) getParent().moveTaskToBack(true); else moveTaskToBack(true); }
+        else navigate(page==Page.APP_PICKER?Page.APPS:page==Page.SETTINGS_DETAILS?Page.SETTINGS:page==Page.STRICT_SETUP?strictParent:Page.HOME);
     }
     @Override public void onBackPressed() { handleBack(); }
     @Override protected void onResume() { super.onResume(); permissionReturn(); handler.removeCallbacks(ticker); handler.postDelayed(ticker,220); }

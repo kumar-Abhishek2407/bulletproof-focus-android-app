@@ -44,7 +44,7 @@ public final class ActiveDotButton extends Button {
         super.onDraw(canvas);
         if(!active) return;
         float density=getResources().getDisplayMetrics().density;
-        int color=(int)new android.animation.ArgbEvaluator().evaluate(phase,0xff367e70,0xff104f43);
+        int color=(int)new android.animation.ArgbEvaluator().evaluate(phase,FocusUi.dark?0xff62ab9a:0xff258778,FocusUi.TEAL);
         dotPaint.setColor(color); dotPaint.setAlpha(Math.round(255*(.6f+.4f*phase)));
         float x=getLayoutDirection()==View.LAYOUT_DIRECTION_RTL?20*density:getWidth()-20*density;
         canvas.drawCircle(x,getHeight()/2f,5*density*(.75f+.4f*phase),dotPaint);

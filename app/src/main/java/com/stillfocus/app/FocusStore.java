@@ -66,6 +66,15 @@ public final class FocusStore {
     public long shortsRemaining() { return shortsRemaining(true); }
     public long webShortsRemaining() { return shortsRemaining(false); }
     private long shortsRemaining(boolean app) { long left=0; for(TimedBlock t:active()) if(t.shorts && t.app==app) left=Math.max(left,remaining(t)); return left; }
+    public void requireYouTubeTimerAvailable(Set<String> apps,boolean shorts) {
+        if(!apps.contains(ScreenRules.YOUTUBE)) return;
+        for(TimedBlock block:active()) {
+            if(block.app && ScreenRules.YOUTUBE.equals(block.target) && (!block.shorts || shorts))
+                throw new IllegalStateException(block.shorts
+                    ? "YouTube Shorts already has a timer. You can still block the whole app."
+                    : "YouTube is paused. Wait for its timer to end before starting another YouTube timer.");
+        }
+    }
     public void start(Set<String> domains,Set<String> apps,int minutes,boolean strict) { start(domains,apps,minutes,strict,false); }
     public void start(Set<String> domains,Set<String> apps,int minutes,boolean strict,boolean shorts) {
         start(domains,apps,minutes,strict,shorts,false);
@@ -80,9 +89,14 @@ public final class FocusStore {
             SessionMode.validate(strict,ManagedProtection.ready(context),strict || NormalAppBlocker.ready(context),!apps.isEmpty());
             for(String pkg:apps) if(CallSafety.protectedApp(context,pkg)) throw new IllegalArgumentException("Phone and calling apps are excluded to protect calls.");
             for(String domain:domains) if(CallDomains.carrier(domain)) throw new IllegalArgumentException("Carrier calling domains cannot be blocked.");
+            requireYouTubeTimerAvailable(apps,shorts);
             previous=active(); List<TimedBlock> updated=new ArrayList<>(previous);
             if(webShorts && activeTarget(false,ScreenRules.WEB_SHORTS)) throw new IllegalStateException("YouTube Shorts (web) already has a timer.");
-            for(TimedBlock t:previous) if(t.app?apps.contains(t.target):domains.contains(t.target)) throw new IllegalStateException("This item already has its own timer. Choose another item.");
+            for(TimedBlock t:previous) {
+                boolean addingWholeYouTube=t.app && t.shorts && ScreenRules.YOUTUBE.equals(t.target) && !shorts;
+                if((t.app?apps.contains(t.target):domains.contains(t.target)) && !addingWholeYouTube)
+                    throw new IllegalStateException("This item already has its own timer. Choose another item.");
+            }
             long duration=minutes*60000L,wall=System.currentTimeMillis()+duration,elapsed=SystemClock.elapsedRealtime()+duration; int currentBoot=boot();
             for(String pkg:apps) updated.add(new TimedBlock(UUID.randomUUID().toString(),pkg,true,strict,wall,elapsed,currentBoot,shorts && ScreenRules.YOUTUBE.equals(pkg)));
             for(String host:domains) updated.add(new TimedBlock(UUID.randomUUID().toString(),host,false,strict,wall,elapsed,currentBoot));

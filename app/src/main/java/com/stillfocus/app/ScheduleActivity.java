@@ -15,16 +15,17 @@ import java.util.concurrent.*;
 
 /** Daily app schedules, with a small list > editor > app picker hierarchy. */
 public final class ScheduleActivity extends Activity {
-    private static final int GREEN=FocusUi.ACCENT,INK=FocusUi.INK,MUTED=FocusUi.MUTED,PAPER=FocusUi.PAPER;
+    private int GREEN,INK,MUTED,PAPER;
     private int transitionDirection=0;
     private int renderGeneration;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final FocusNavigation.Swipe swipe=new FocusNavigation.Swipe();
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
-        int tab=swipe.target(this,event,2);
+        int tab=getParent()!=null?-1:swipe.target(this,event,2);
         if(tab>=0) { MotionEvent cancel=MotionEvent.obtain(event); cancel.setAction(MotionEvent.ACTION_CANCEL); super.dispatchTouchEvent(cancel); cancel.recycle(); FocusNavigation.open(this,tab); return true; }
         return super.dispatchTouchEvent(event);
     }
+    public boolean isTabRoot() { return page==0; }
     private int page=0,start=21*60,end=9*60;
     private String id="",name="Evening pause";
     private boolean strict=false,enabled=true;
@@ -43,13 +44,13 @@ public final class ScheduleActivity extends Activity {
             else if(page!=0 && !id.isEmpty()) { AppSchedule saved=store.find(id); if(saved!=null && saved.active(ScheduleStore.now())) { page=0; render(); message("Schedule active","Editing unlocks when this schedule ends."); } } handler.postDelayed(this,1000); }
     };
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); store=new ScheduleStore(this);
+        FocusUi.applyTheme(this); GREEN=FocusUi.ACCENT; INK=FocusUi.INK; MUTED=FocusUi.MUTED; PAPER=FocusUi.PAPER; super.onCreate(state); store=new ScheduleStore(this);
         if(state!=null) {
             page=state.getInt("page"); start=state.getInt("start",1260); end=state.getInt("end",540);
             id=state.getString("id",""); name=state.getString("name","Evening pause"); strict=state.getBoolean("strict"); enabled=state.getBoolean("enabled",true);
             ArrayList<String> saved=state.getStringArrayList("apps"); if(saved!=null) apps.addAll(saved);
         }
-        if(Build.VERSION.SDK_INT>=33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
+        if(getParent()==null && Build.VERSION.SDK_INT>=33) getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
         render();
     }
     @Override protected void onSaveInstanceState(Bundle out) {
@@ -102,7 +103,7 @@ public final class ScheduleActivity extends Activity {
     }
     private void list() {
         displayedState=stateKey();
-        root.addView(text("Pause apps every day. Active schedules cannot be edited, disabled or deleted until their end time.",15,MUTED));
+        root.addView(text("Your daily routines. Active schedules stay locked until they finish.",15,MUTED));
         List<AppSchedule> entries=store.all();
         boolean normalEnabled=false; for(AppSchedule s:entries) normalEnabled|=s.enabled && !s.strict;
         if(normalEnabled && !NormalAppBlocker.ready(this)) {
@@ -116,7 +117,7 @@ public final class ScheduleActivity extends Activity {
             row.addView(text("Every day  /  "+s.apps.size()+" apps  /  "+(s.strict?"Strict":"Normal"),14,MUTED));
             boolean active=s.active(ScheduleStore.now());
             boolean ready=s.strict?ManagedProtection.enforced(this):NormalAppBlocker.ready(this) && (FocusAccessibilityService.active() || FocusVpnService.running);
-            row.addView(text(!s.enabled?"Off":active?(ready?"Window active":"Window active - protection needs attention"):"Starts at "+time(s.window.start),14,GREEN));
+            row.addView(text(!s.enabled?"Off":active?(ready?"Active":"Active \u00b7 Needs attention"):"Starts at "+time(s.window.start),14,GREEN));
             LinearLayout icons=new LinearLayout(this); int shown=0;
             for(String pkg:new TreeSet<>(s.apps)) { if(shown++>=5) break; ImageView v=icon(pkg); LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(32),dp(32)); lp.rightMargin=dp(8); icons.addView(v,lp); } row.addView(icons);
             Switch toggle=new Switch(this); toggle.setText("Enabled"); toggle.setTextColor(INK); toggle.setMinHeight(dp(48)); toggle.setChecked(s.enabled); toggle.setEnabled(!active); row.addView(toggle);

@@ -1,0 +1,12 @@
+<resources>
+    <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#C0B4EF</item>
+        <item name="android:colorControlHighlight">#33C0B4EF</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#17191F</item>
+        <item name="android:navigationBarColor">#17191F</item>
+        <item name="android:windowBackground">#17191F</item>
+        <item name="android:windowAnimationStyle">@style/FocusWindowAnimation</item>
+    </style>
+</resources>

@@ -1,12 +1,12 @@
 <resources>
-    <style name="AppThemeBase" parent="android:style/Theme.Material.NoActionBar">
+    <style name="AppThemeBase" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#B6E397</item>
-        <item name="android:colorControlHighlight">#33B6E397</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#131914</item>
-        <item name="android:navigationBarColor">#131914</item>
-        <item name="android:windowBackground">#131914</item>
+        <item name="android:colorAccent">#6554C0</item>
+        <item name="android:colorControlHighlight">#336554C0</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F8F9FC</item>
+        <item name="android:navigationBarColor">#F8F9FC</item>
+        <item name="android:windowBackground">#F8F9FC</item>
         <item name="android:windowAnimationStyle">@style/FocusWindowAnimation</item>
     </style>
     <style name="AppTheme" parent="AppThemeBase" />

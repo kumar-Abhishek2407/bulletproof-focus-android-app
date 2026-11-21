@@ -53,7 +53,7 @@ public final class FocusVpnService extends VpnService {
     private Notification notification(String text) {
         return new Notification.Builder(this,"protection").setSmallIcon(R.drawable.ic_shield)
             .setContentTitle("Still Focus").setContentText(text).setOngoing(true)
-            .setContentIntent(PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE)).build();
+            .setContentIntent(PendingIntent.getActivity(this,0,new Intent(this,TabHostActivity.class),PendingIntent.FLAG_IMMUTABLE)).build();
     }
     @Override public synchronized int onStartCommand(Intent intent,int flags,int id) {
         if(reader!=null) {
@@ -113,7 +113,7 @@ public final class FocusVpnService extends VpnService {
                     int n=input.read(buffer); if(n<0) throw new IOException("Tunnel ended");
                     DnsPacket packet=DnsPacket.parse(buffer,n); if(packet==null) continue;
                     queries.incrementAndGet(); lastQuery=SystemClock.elapsedRealtime();
-                    if(WebsiteFilter.blocked(this,packet.host)) write(connection,packet,packet.error(3));
+                    if(DnsPolicy.localAdBlocked(AdBlocking.enabled(this),packet.host) || WebsiteFilter.blocked(this,packet.host)) write(connection,packet,packet.error(3));
                     else {
                         final Tunnel target=connection;
                         try { workers.execute(()->resolve(target,packet)); }
@@ -147,7 +147,8 @@ public final class FocusVpnService extends VpnService {
         if(closing || current!=target) return;
         byte[] answer=null;
         ConnectivityManager cm=getSystemService(ConnectivityManager.class);
-        boolean useAds=!DnsPolicy.mayUseNetworkDns(AdBlocking.enabled(this),CallSafety.callAudio(this),packet.host);
+        boolean adsEnabled=AdBlocking.enabled(this);
+        boolean useAds=!DnsPolicy.mayUseNetworkDns(adsEnabled,CallSafety.callAudio(this),packet.host);
         try {
             List<Network> available=networks();
             // Required filtered requests never fall through to an unfiltered resolver.
@@ -174,7 +175,11 @@ public final class FocusVpnService extends VpnService {
                 }
             }
         } catch(RuntimeException failure) { /* Failed queries receive SERVFAIL, not a dead worker. */ }
-        if(!CallDomains.carrier(packet.host) && store.blocks(packet.host)) answer=packet.error(3);
+        // A call must not leave unfiltered ad addresses cached for hours afterward.
+        if(answer!=null && adsEnabled && !useAds && !CallDomains.communication(packet.host))
+            answer=DnsTtl.limit(answer,30);
+        if(DnsPolicy.localAdBlocked(AdBlocking.enabled(this),packet.host)
+                || (!CallDomains.carrier(packet.host) && store.blocks(packet.host))) answer=packet.error(3);
         write(target,packet,answer==null?packet.error(2):answer);
     }
     private void write(Tunnel target,DnsPacket packet,byte[] dns) {
@@ -198,7 +203,7 @@ public final class FocusVpnService extends VpnService {
         long now=SystemClock.elapsedRealtime();
         String connection=running?"Connected for "+Math.max(0,(now-connectedAt)/60000)+" minutes":status;
         String traffic=lastQuery==0?"No DNS requests received yet. Check browser Secure DNS and Android Private DNS.":queries.get()+" DNS requests received; last request "+Math.max(0,(now-lastQuery)/1000)+" seconds ago";
-        String ads=!AdBlocking.enabled(c)?"Ad blocking: off":CallSafety.callAudio(c)?"Ad blocking: call bypass active":lastAdFailure>lastAdSuccess?"Ad blocking: AdGuard unavailable; filtered DNS requests are waiting. Turn off ad blocking to restore ordinary DNS.":lastAdSuccess>0?"Ad blocking: AdGuard responding":"Ad blocking: enabled; waiting for a DNS request";
+        String ads=!AdBlocking.enabled(c)?"Ad blocking: off":CallSafety.callAudio(c)?"Ad blocking: call safety bypass; known Truecaller ad domains still blocked":lastAdFailure>lastAdSuccess?"Ad blocking: AdGuard unavailable; filtered DNS requests are waiting. Turn off ad blocking to restore ordinary DNS.":lastAdSuccess>0?"Ad blocking: AdGuard responding":"Ad blocking: enabled; waiting for a DNS request";
         android.content.SharedPreferences health=c.getSharedPreferences("protectionHealth",0);
         long issueAt=health.getLong("issueAt",0);
         long boundary=health.getLong("nextSchedule",0);

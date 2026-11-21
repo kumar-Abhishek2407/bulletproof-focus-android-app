@@ -1,6 +1,32 @@
-# Still Focus for Android - normal and strict modes (0.29.1)
+# Still Focus for Android - normal and strict modes (0.33.0)
 
 Native Android focus app with timed website blocks, app focus screens and bundled adult-domain filtering. No account, analytics, ads or backend.
+
+## 0.33.0: Light and dark mode
+
+Install [StillFocus-0.33.0.apk](artifacts/StillFocus-0.33.0.apk). Tap the moon/sun button at the top right to switch themes. Your choice is saved. Dark mode uses soft charcoal, muted lavender and off-white text, with matching dialogs and system bars. You can also switch from Settings.
+
+## 0.32.0: Separate daily pages and draggable tabs
+
+Install [StillFocus-0.32.0.apk](artifacts/StillFocus-0.32.0.apk). Set a limit and Apps with limits open separate pages with Back navigation. Settings contains short category buttons; diagnostics appear only when requested. The shared tab container moves real neighboring page views with the finger, with a subtle fade, a commit threshold and cancel animation. Swiping is limited to tab home pages, leaving forms and pickers alone.
+
+Device checks still required: hold halfway between every pair of tabs, reverse and cancel a drag, rotate, return from Android permission screens, and test Back from both daily-limit lists.
+
+## 0.31.0: Warm white and iris purple
+
+Install [StillFocus-0.31.0.apk](artifacts/StillFocus-0.31.0.apk). Light backgrounds, white bordered cards, iris primary buttons, lavender selected tabs, slate text and teal status dots. Android dialogs and system bars follow the light theme. Focus uses one filled primary action and outlined secondary actions.
+
+## 0.30.1: Block YouTube while Shorts is paused
+
+Install [StillFocus-0.30.1.apk](artifacts/StillFocus-0.30.1.apk). You can start a whole-YouTube timer during an active Shorts timer. Both keep their own end times: if the whole-app timer ends first, Shorts remains paused. Duplicate whole-app or Shorts timers are still prevented. This replaces the earlier mutual-exclusion rule.
+
+## 0.30.0: Compact charcoal design
+
+Install [StillFocus-0.30.0.apk](artifacts/StillFocus-0.30.0.apk). Charcoal surfaces, mint primary actions, outlined secondary actions, icon navigation, live section counts and daily usage bars make the four tabs easier to scan. Settings use clearer group headings. The mint status pulse stays visible on dark buttons.
+
+## 0.29.2: YouTube timer selection
+
+Install [StillFocus-0.29.2.apk](artifacts/StillFocus-0.29.2.apk). A running YouTube Shorts timer prevents starting a whole-YouTube timer, and vice versa. The app checks before showing confirmation and again when saving, with a clear wait-until-expiry message.
 
 ## 0.29.1: Correct swipe direction
 
@@ -598,3 +624,11 @@ This is a focus cover and Home redirect, not force-stop or task removal. The sel
 ## Version 0.15.0
 
 New app timers and enabled schedules require verified strict suspension. The app checks suspension on each management reconciliation instead of trusting only its cached desired state. Device-owner setup and real-device enforcement testing remain required.
+
+### 0.33.1: Truecaller ad filtering
+
+Known Truecaller advertising endpoints are now blocked locally when ad blocking is on, including during the call-safety DNS bypass. Calling infrastructure exemptions remain in place. Temporary unfiltered DNS answers for other non-communication domains have a 30-second TTL cap, so a call does not leave long-lived bypass results in DNS caches.
+
+The narrow rules come from the [AdGuard DNS filter](https://github.com/AdguardTeam/AdGuardSDNSFilter). This does not guarantee removal of every ad: downloaded ads, existing connections, encrypted DNS and ads sharing essential service domains can remain.
+
+To check the update yourself: install the new APK, keep ad blocking on, and after any call ends, force-stop Truecaller and clear its **cache only**, then reopen it. Do not clear its storage/data. Calls and caller lookup still need real-device verification; no phone testing was performed for this release.
